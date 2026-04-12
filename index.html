@@ -1,0 +1,669 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ሚኒሽ የውበት ሳሎን (Minish Salon)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .checkbox-group { display: flex; align-items: center; gap: 10px; background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .checkbox-group input { width: 24px; height: 24px; cursor: pointer; accent-color: var(--accent-gold); }
+    .checkbox-group label { margin-bottom: 0; font-size: 1.1rem; color: #6EE7B7; cursor: pointer; font-weight: 500;}
+    /* Print Styles for thermal receipt printing */
+    @media print {
+      body * { visibility: hidden; }
+      #print-receipt-area, #print-receipt-area * { visibility: visible; }
+      #print-receipt-area { position: absolute; left: 0; top: 0; width: 80mm; font-family: monospace; font-size: 12px; color: black !important;}
+      .status-badge { border: 1px solid black; background: white!important; color: black!important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Floating Menu and Overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <button class="floating-menu-btn" id="floating-menu-btn">
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+  </button>
+
+  <div class="app-container">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <img src="logo.jpeg" alt="Minish Logo" class="salon-logo">
+          <div class="logo-text">
+            <h1>ሚኒሽ</h1>
+            <p>የውበት ሳሎን</p>
+          </div>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-target="cashier-view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          ካሸር (ገንዘብ ተቀባይ)
+        </button>
+        <button class="nav-btn" data-target="manager-view" id="nav-manager">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          ማናጀር (ሳራ)
+        </button>
+        <button class="nav-btn" data-target="inventory-view" id="nav-inventory">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          ዕቃዎች (Inventory)
+        </button>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      
+      <!-- Cashier View -->
+      <section id="cashier-view" class="view-section active">
+        <header class="view-header">
+          <h2>የካሸር ማስተናገጃ ዳሽቦርድ</h2>
+          <p>ክፍያዎችን፣ የክፍያ አይነቱን፣ እና ደረሰኞችን ይቆጣጠሩ።</p>
+        </header>
+
+        <div class="cashier-grid">
+          <div class="glass-card">
+            <h3 style="color: var(--success);">ስራ እና ክፍያ መመዝገቢያ (POS)</h3>
+            <div class="assign-form" id="cashier-form">
+              
+              <div class="form-group">
+                <label>የደንበኛዋ ስም (አማራጭ ነው)</label>
+                <input type="text" id="customer-name" placeholder="ለምሳሌ ሃና">
+              </div>
+
+              <div class="form-group">
+                <label>ማነው ስራውን የሰራው / ያገለገለው?</label>
+                <select id="active-employee-select">
+                  <option value="">-- ሰራተኛውን ይምረጡ --</option>
+                  <!-- JS Injected employees -->
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>ምን አይነት ስራ ነው የተሰራው?</label>
+                <select id="service-type">
+                  <option value="Haircut/Style">ፀጉር መስራት / መቁረጥ</option>
+                  <option value="Corn Row/Braid">ቁጥርጥር / ሹሩባ</option>
+                  <option value="Nails">ጥፍር አሰራር</option>
+                  <option value="Washing">ፀጉር ማጠብ</option>
+                  <option value="Moroco Bath">ሞሮኮ ባዝ</option>
+                  <option value="Facial/Eyelash">ማሳጅ / ማፅዳት / የዓይን ሽፋሽፍት</option>
+                  <option value="Color">ፀጉር ቀለም</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label>የአገልግሎቱ ክፍያ መጠን (በብር)</label>
+                <input type="number" id="service-price" placeholder="ለምሳሌ 500">
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label>ለደንበኛዋ የተሸጠ ዕቃ ካለ (Retail Item Sold)</label>
+                <select id="product-sold-select">
+                  <option value="">-- ምንም አልተሸጠም --</option>
+                </select>
+                <div id="product-qty-group" class="hidden" style="margin-top: 10px;">
+                   <label>ስንት ፍሬ ተሸጠ?</label>
+                   <input type="number" id="product-sold-qty" value="1" min="1">
+                </div>
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label>ለስራው የተጠቀምንበት የሳሎን ዕቃ ካለ (Internal Item Used)</label>
+                <select id="product-used-select">
+                  <option value="">-- ምንም ዕቃ አልወጣም --</option>
+                </select>
+                <div id="product-used-qty-group" class="hidden" style="margin-top: 10px;">
+                   <label>ስንት ፍሬ ተጠቀምን?</label>
+                   <input type="number" id="product-used-qty" value="1" min="1">
+                </div>
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label style="color: var(--accent-gold);">ደንበኛዋ በምን ከፈለች? (Payment Method)</label>
+                <select id="payment-method">
+                  <option value="Cash">ጥሬ ገንዘብ (Cash)</option>
+                  <option value="Bank">ባንክ / ሞባይል ባንኪንግ (Bank Transfer)</option>
+                </select>
+              </div>
+
+              <!-- TAX TOGGLE BUTTON -->
+              <div class="form-group checkbox-group" style="margin-top: 25px;">
+                <input type="checkbox" id="tax-receipt-toggle">
+                <label for="tax-receipt-toggle">ይህ ክፍያ ህጋዊ ደረሰኝ ተቆርጦለታል (Official Tax Receipt)</label>
+              </div>
+              
+              <button id="btn-log-service" class="btn-primary" style="font-size: 1.2rem; padding: 1.2rem;">ክፍያውን ወደ ማህደር አስገባ</button>
+            </div>
+          </div>
+
+          <div class="glass-card full-width">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3>በካሸር የተመዘገቡ ክፍያዎች</h3>
+              <button id="btn-print-last" class="btn-secondary" style="margin-bottom:15px; background: rgba(255,255,255,0.15);">🖨️ ለመጨረሻው ደንበኛ ደረሰኝ አትም</button>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="status-table">
+                <thead>
+                  <tr>
+                    <th>ሰዓት</th>
+                    <th>የክፍያ አይነት</th>
+                    <th>ሰራተኛ</th>
+                    <th>ክፍያና እቃ</th>
+                    <th>ጠቅላላ ብር</th>
+                    <th>ግብር እውቅና</th>
+                  </tr>
+                </thead>
+                <tbody id="today-logs-list">
+                  <!-- JS Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Manager View -->
+      <section id="manager-view" class="view-section">
+        <header class="view-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2>የማናጀር መቆጣጠሪያ</h2>
+            <p>በጥሬ ገንዘብ የተሰበሰበውን ከባንክ ገቢ ይለዩ፣ እና ሪፖርቱን ወደ ውጭ ለእይታ ያውጡ።</p>
+          </div>
+          <div>
+            <select id="manager-date-filter" class="large-select" style="background:var(--accent-gold); color:var(--bg-primary); border:none; border-radius:12px; font-weight:bold; cursor:pointer; width:auto; min-width:180px;">
+              <option value="today">የዛሬ (Today)</option>
+              <option value="week">የዚህ ሳምንት (This Week)</option>
+              <option value="month">የዚህ ወር (This Month)</option>
+              <option value="year">የዚህ አመት (This Year)</option>
+              <option value="all">ሁሉንም ጊዜ (All Time)</option>
+            </select>
+          </div>
+        </header>
+
+        <!-- Financial Breakdown -->
+        <div class="stats-grid">
+          <div class="stat-card" style="border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(212,175,55,0.2);">
+            <h4>ሙሉ ጠቅላላ ገቢ</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">የጥሬ ገንዘብ + የባንክ + ግብር</p>
+            <div class="stat-val" id="stat-total-revenue" style="color: var(--accent-gold);">0</div>
+          </div>
+          
+          <!-- New Cash vs Bank rows -->
+          <div style="display: flex; flex-direction: column; gap:10px;">
+            <div class="stat-card" style="border-color: #3B82F6; padding: 1rem; flex:1;">
+              <h4 style="color: #3B82F6;">የባንክ ገቢ (Bank Tracker)</h4>
+              <div class="stat-val" id="stat-bank-revenue" style="color: #3B82F6; font-size:1.8rem;">0</div>
+            </div>
+            <div class="stat-card" style="border-color: #10B981; padding: 1rem; flex:1;">
+              <h4 style="color: #10B981;">እጅ ላይ ጥሬ ገንዘብ (Cash Drawer)</h4>
+              <div class="stat-val" id="stat-cash-revenue" style="color: #10B981; font-size:1.8rem;">0</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap:10px;">
+            <div class="stat-card" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.05); padding: 1rem; flex:1;">
+              <h4 style="color: var(--success);">ደረሰኝ የተቆረጠበት (Taxed)</h4>
+              <div class="stat-val" id="stat-taxed-revenue" style="color: var(--success); font-size:1.8rem;">0</div>
+            </div>
+            <div class="stat-card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); padding: 1rem; flex:1;">
+              <h4 style="color: var(--danger);">ያልተቆረጠ (Internal)</h4>
+              <div class="stat-val" id="stat-internal-revenue" style="color: var(--danger); font-size:1.8rem;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="manager-grid">
+          <div class="glass-card full-width" style="display:flex; justify-content:space-between; align-items:center; background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3);">
+            <div>
+              <h3 style="color: #60A5FA;">የዕለቱን ሪፖርት ወደ Excel ማውረጃ (Export CSV)</h3>
+              <p style="color:var(--text-muted); font-size: 0.9rem;">ለአካውንታንት ወይንም ለራስዎ ለማስቀመጥ የዕለቱን ድምር ወደ (CSV) ኤክስፖርት ያድርጉ።</p>
+            </div>
+            <button id="btn-export-csv" class="btn-primary" style="width: auto; padding: 1rem 2rem; background: #3B82F6;">📊 Download CSV Report</button>
+          </div>
+
+          <div class="glass-card">
+            <h3>የሰራተኞች ደረጃ (Leaderboard)</h3>
+            <ul class="leaderboard-list" id="leaderboard-list">
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <h3>የዕለቱ የሥራ ማህደር</h3>
+            <div class="table-responsive">
+              <table class="status-table">
+                <thead>
+                  <tr>
+                    <th>ሰዓት</th>
+                    <th>ሰራተኛ</th>
+                    <th>ክፍያ ዘዴ</th>
+                    <th>ገቢ </th>
+                    <th>ደረሰኝ (Tax)</th>
+                  </tr>
+                </thead>
+                <tbody id="manager-audit-log-list">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-clear-data" class="btn-danger mt-4" style="font-size: 1rem; padding: 1rem; width: 100%;">የእለቱ ስራ ስላለቀ ሙሉ ዳታውን አጥፋ (Reset Next Day System)</button>
+      </section>
+
+      <!-- Inventory View -->
+      <section id="inventory-view" class="view-section">
+        <header class="view-header">
+          <h2>የዕቃዎች ማስተዳደሪያ (Stock)</h2>
+          <p>የሽያጭ (Retail) እና የሳሎን መገልገያ (Internal) እቃዎችን ይቆጣጠሩ</p>
+        </header>
+
+        <div class="manager-grid">
+           <!-- Form to Add Item -->
+           <div class="glass-card">
+              <h3>አዲስ እቃ መመዝገቢያ</h3>
+              <div class="form-group">
+                <label>የእቃው ስም (Name)</label>
+                <input type="text" id="inv-name" placeholder="ለምሳሌ Hair Color Tube 01">
+              </div>
+              <div class="form-group">
+                <label>የእቃው አይነት (Type)</label>
+                <select id="inv-type">
+                  <option value="Retail">ለሽያጭ የሚቀርብ (Retail)</option>
+                  <option value="Internal">ለሳሎን ስራ መገልገያ (Internal Use)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ብዛት (Quantity)</label>
+                <input type="number" id="inv-qty" placeholder="ስንት ፍሬ አለ?">
+              </div>
+              <div class="form-group">
+                <label>የመግዣ ዋጋ በብር (Buy Price) - ለአንድ ፍሬ</label>
+                <input type="number" id="inv-buy" placeholder="ለምሳሌ 200">
+              </div>
+              <div class="form-group" id="inv-sell-group">
+                <label>የመሸጫ ዋጋ በብር (Sell Price) - ለአንድ ፍሬ</label>
+                <input type="number" id="inv-sell" placeholder="ለምሳሌ 350">
+              </div>
+              <button id="btn-add-inventory" class="btn-success">መዝግብ (Add Item)</button>
+           </div>
+           
+           <div class="glass-card full-width">
+              <h3>በስቶክ ውስጥ ያሉ እቃዎች</h3>
+              <div class="table-responsive">
+                <table class="status-table">
+                  <thead>
+                    <tr><th>ስም</th><th>አይነት</th><th>ብዛት</th><th>መግዣ</th><th>መሸጫ</th><th>ድርጊት</th></tr>
+                  </thead>
+                  <tbody id="inventory-list">
+                  </tbody>
+                </table>
+              </div>
+           </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Hidden Printable Area for Receipts -->
+    <div id="print-receipt-area" style="display: none; padding: 10px; background: white; color: black; border: 1px dotted #ccc;">
+       <h3 style="text-align: center; margin: 0; padding:0; margin-bottom: 5px;">Minish Beauty Salon</h3>
+       <p style="text-align: center; font-size: 10px; margin: 0; padding:0; margin-bottom: 10px;" id="print-date">Date</p>
+       <div id="print-content" style="font-size: 11px;"></div>
+       <p style="text-align: center; font-size: 10px; margin-top: 15px;">* Thanks for coming! *</p>
+    </div>
+
+  </div>
+
+  <div id="login-modal" class="modal-overlay hidden">
+    <div class="glass-card login-box">
+      <h3>የማናጀር ፈቃድ ያስፈልጋል</h3>
+      <div class="form-group">
+        <input type="password" id="manager-password" placeholder="የማለፊያ ኮድ (PIN)">
+      </div>
+      <button id="btn-admin-login" class="btn-success">ክፈት</button>
+      <button id="btn-admin-cancel" class="btn-danger mt-4 bg-transparent shadow-none" style="background:transparent; color: var(--text-muted); padding:0;">ተመለስ</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ሚኒሽ የውበት ሳሎን (Minish Salon)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .checkbox-group { display: flex; align-items: center; gap: 10px; background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .checkbox-group input { width: 24px; height: 24px; cursor: pointer; accent-color: var(--accent-gold); }
+    .checkbox-group label { margin-bottom: 0; font-size: 1.1rem; color: #6EE7B7; cursor: pointer; font-weight: 500;}
+    /* Print Styles for thermal receipt printing */
+    @media print {
+      body * { visibility: hidden; }
+      #print-receipt-area, #print-receipt-area * { visibility: visible; }
+      #print-receipt-area { position: absolute; left: 0; top: 0; width: 80mm; font-family: monospace; font-size: 12px; color: black !important;}
+      .status-badge { border: 1px solid black; background: white!important; color: black!important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Floating Menu and Overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <button class="floating-menu-btn" id="floating-menu-btn">
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+  </button>
+
+  <div class="app-container">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <img src="logo.jpeg" alt="Minish Logo" class="salon-logo">
+          <div class="logo-text">
+            <h1>ሚኒሽ</h1>
+            <p>የውበት ሳሎን</p>
+          </div>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-target="cashier-view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          ካሸር (ገንዘብ ተቀባይ)
+        </button>
+        <button class="nav-btn" data-target="manager-view" id="nav-manager">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          ማናጀር (ሳራ)
+        </button>
+        <button class="nav-btn" data-target="inventory-view" id="nav-inventory">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          ዕቃዎች (Inventory)
+        </button>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      
+      <!-- Cashier View -->
+      <section id="cashier-view" class="view-section active">
+        <header class="view-header">
+          <h2>የካሸር ማስተናገጃ ዳሽቦርድ</h2>
+          <p>ክፍያዎችን፣ የክፍያ አይነቱን፣ እና ደረሰኞችን ይቆጣጠሩ።</p>
+        </header>
+
+        <div class="cashier-grid">
+          <div class="glass-card">
+            <h3 style="color: var(--success);">ስራ እና ክፍያ መመዝገቢያ (POS)</h3>
+            <div class="assign-form" id="cashier-form">
+              
+              <div class="form-group">
+                <label>የደንበኛዋ ስም (አማራጭ ነው)</label>
+                <input type="text" id="customer-name" placeholder="ለምሳሌ ሃና">
+              </div>
+
+              <div class="form-group">
+                <label>ማነው ስራውን የሰራው / ያገለገለው?</label>
+                <select id="active-employee-select">
+                  <option value="">-- ሰራተኛውን ይምረጡ --</option>
+                  <!-- JS Injected employees -->
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>ምን አይነት ስራ ነው የተሰራው?</label>
+                <select id="service-type">
+                  <option value="Haircut/Style">ፀጉር መስራት / መቁረጥ</option>
+                  <option value="Corn Row/Braid">ቁጥርጥር / ሹሩባ</option>
+                  <option value="Nails">ጥፍር አሰራር</option>
+                  <option value="Washing">ፀጉር ማጠብ</option>
+                  <option value="Moroco Bath">ሞሮኮ ባዝ</option>
+                  <option value="Facial/Eyelash">ማሳጅ / ማፅዳት / የዓይን ሽፋሽፍት</option>
+                  <option value="Color">ፀጉር ቀለም</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label>የአገልግሎቱ ክፍያ መጠን (በብር)</label>
+                <input type="number" id="service-price" placeholder="ለምሳሌ 500">
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label>ለደንበኛዋ የተሸጠ ዕቃ ካለ (Retail Item Sold)</label>
+                <select id="product-sold-select">
+                  <option value="">-- ምንም አልተሸጠም --</option>
+                </select>
+                <div id="product-qty-group" class="hidden" style="margin-top: 10px;">
+                   <label>ስንት ፍሬ ተሸጠ?</label>
+                   <input type="number" id="product-sold-qty" value="1" min="1">
+                </div>
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label>ለስራው የተጠቀምንበት የሳሎን ዕቃ ካለ (Internal Item Used)</label>
+                <select id="product-used-select">
+                  <option value="">-- ምንም ዕቃ አልወጣም --</option>
+                </select>
+                <div id="product-used-qty-group" class="hidden" style="margin-top: 10px;">
+                   <label>ስንት ፍሬ ተጠቀምን?</label>
+                   <input type="number" id="product-used-qty" value="1" min="1">
+                </div>
+              </div>
+
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                <label style="color: var(--accent-gold);">ደንበኛዋ በምን ከፈለች? (Payment Method)</label>
+                <select id="payment-method">
+                  <option value="Cash">ጥሬ ገንዘብ (Cash)</option>
+                  <option value="Bank">ባንክ / ሞባይል ባንኪንግ (Bank Transfer)</option>
+                </select>
+              </div>
+
+              <!-- TAX TOGGLE BUTTON -->
+              <div class="form-group checkbox-group" style="margin-top: 25px;">
+                <input type="checkbox" id="tax-receipt-toggle">
+                <label for="tax-receipt-toggle">ይህ ክፍያ ህጋዊ ደረሰኝ ተቆርጦለታል (Official Tax Receipt)</label>
+              </div>
+              
+              <button id="btn-log-service" class="btn-primary" style="font-size: 1.2rem; padding: 1.2rem;">ክፍያውን ወደ ማህደር አስገባ</button>
+            </div>
+          </div>
+
+          <div class="glass-card full-width">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3>በካሸር የተመዘገቡ ክፍያዎች</h3>
+              <button id="btn-print-last" class="btn-secondary" style="margin-bottom:15px; background: rgba(255,255,255,0.15);">🖨️ ለመጨረሻው ደንበኛ ደረሰኝ አትም</button>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="status-table">
+                <thead>
+                  <tr>
+                    <th>ሰዓት</th>
+                    <th>የክፍያ አይነት</th>
+                    <th>ሰራተኛ</th>
+                    <th>ክፍያና እቃ</th>
+                    <th>ጠቅላላ ብር</th>
+                    <th>ግብር እውቅና</th>
+                  </tr>
+                </thead>
+                <tbody id="today-logs-list">
+                  <!-- JS Injected -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Manager View -->
+      <section id="manager-view" class="view-section">
+        <header class="view-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2>የማናጀር መቆጣጠሪያ</h2>
+            <p>በጥሬ ገንዘብ የተሰበሰበውን ከባንክ ገቢ ይለዩ፣ እና ሪፖርቱን ወደ ውጭ ለእይታ ያውጡ።</p>
+          </div>
+          <div>
+            <select id="manager-date-filter" class="large-select" style="background:var(--accent-gold); color:var(--bg-primary); border:none; border-radius:12px; font-weight:bold; cursor:pointer; width:auto; min-width:180px;">
+              <option value="today">የዛሬ (Today)</option>
+              <option value="week">የዚህ ሳምንት (This Week)</option>
+              <option value="month">የዚህ ወር (This Month)</option>
+              <option value="year">የዚህ አመት (This Year)</option>
+              <option value="all">ሁሉንም ጊዜ (All Time)</option>
+            </select>
+          </div>
+        </header>
+
+        <!-- Financial Breakdown -->
+        <div class="stats-grid">
+          <div class="stat-card" style="border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(212,175,55,0.2);">
+            <h4>ሙሉ ጠቅላላ ገቢ</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">የጥሬ ገንዘብ + የባንክ + ግብር</p>
+            <div class="stat-val" id="stat-total-revenue" style="color: var(--accent-gold);">0</div>
+          </div>
+          
+          <!-- New Cash vs Bank rows -->
+          <div style="display: flex; flex-direction: column; gap:10px;">
+            <div class="stat-card" style="border-color: #3B82F6; padding: 1rem; flex:1;">
+              <h4 style="color: #3B82F6;">የባንክ ገቢ (Bank Tracker)</h4>
+              <div class="stat-val" id="stat-bank-revenue" style="color: #3B82F6; font-size:1.8rem;">0</div>
+            </div>
+            <div class="stat-card" style="border-color: #10B981; padding: 1rem; flex:1;">
+              <h4 style="color: #10B981;">እጅ ላይ ጥሬ ገንዘብ (Cash Drawer)</h4>
+              <div class="stat-val" id="stat-cash-revenue" style="color: #10B981; font-size:1.8rem;">0</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap:10px;">
+            <div class="stat-card" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.05); padding: 1rem; flex:1;">
+              <h4 style="color: var(--success);">ደረሰኝ የተቆረጠበት (Taxed)</h4>
+              <div class="stat-val" id="stat-taxed-revenue" style="color: var(--success); font-size:1.8rem;">0</div>
+            </div>
+            <div class="stat-card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); padding: 1rem; flex:1;">
+              <h4 style="color: var(--danger);">ያልተቆረጠ (Internal)</h4>
+              <div class="stat-val" id="stat-internal-revenue" style="color: var(--danger); font-size:1.8rem;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="manager-grid">
+          <div class="glass-card full-width" style="display:flex; justify-content:space-between; align-items:center; background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3);">
+            <div>
+              <h3 style="color: #60A5FA;">የዕለቱን ሪፖርት ወደ Excel ማውረጃ (Export CSV)</h3>
+              <p style="color:var(--text-muted); font-size: 0.9rem;">ለአካውንታንት ወይንም ለራስዎ ለማስቀመጥ የዕለቱን ድምር ወደ (CSV) ኤክስፖርት ያድርጉ።</p>
+            </div>
+            <button id="btn-export-csv" class="btn-primary" style="width: auto; padding: 1rem 2rem; background: #3B82F6;">📊 Download CSV Report</button>
+          </div>
+
+          <div class="glass-card">
+            <h3>የሰራተኞች ደረጃ (Leaderboard)</h3>
+            <ul class="leaderboard-list" id="leaderboard-list">
+            </ul>
+          </div>
+
+          <div class="glass-card">
+            <h3>የዕለቱ የሥራ ማህደር</h3>
+            <div class="table-responsive">
+              <table class="status-table">
+                <thead>
+                  <tr>
+                    <th>ሰዓት</th>
+                    <th>ሰራተኛ</th>
+                    <th>ክፍያ ዘዴ</th>
+                    <th>ገቢ </th>
+                    <th>ደረሰኝ (Tax)</th>
+                  </tr>
+                </thead>
+                <tbody id="manager-audit-log-list">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-clear-data" class="btn-danger mt-4" style="font-size: 1rem; padding: 1rem; width: 100%;">የእለቱ ስራ ስላለቀ ሙሉ ዳታውን አጥፋ (Reset Next Day System)</button>
+      </section>
+
+      <!-- Inventory View -->
+      <section id="inventory-view" class="view-section">
+        <header class="view-header">
+          <h2>የዕቃዎች ማስተዳደሪያ (Stock)</h2>
+          <p>የሽያጭ (Retail) እና የሳሎን መገልገያ (Internal) እቃዎችን ይቆጣጠሩ</p>
+        </header>
+
+        <div class="manager-grid">
+           <!-- Form to Add Item -->
+           <div class="glass-card">
+              <h3>አዲስ እቃ መመዝገቢያ</h3>
+              <div class="form-group">
+                <label>የእቃው ስም (Name)</label>
+                <input type="text" id="inv-name" placeholder="ለምሳሌ Hair Color Tube 01">
+              </div>
+              <div class="form-group">
+                <label>የእቃው አይነት (Type)</label>
+                <select id="inv-type">
+                  <option value="Retail">ለሽያጭ የሚቀርብ (Retail)</option>
+                  <option value="Internal">ለሳሎን ስራ መገልገያ (Internal Use)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ብዛት (Quantity)</label>
+                <input type="number" id="inv-qty" placeholder="ስንት ፍሬ አለ?">
+              </div>
+              <div class="form-group">
+                <label>የመግዣ ዋጋ በብር (Buy Price) - ለአንድ ፍሬ</label>
+                <input type="number" id="inv-buy" placeholder="ለምሳሌ 200">
+              </div>
+              <div class="form-group" id="inv-sell-group">
+                <label>የመሸጫ ዋጋ በብር (Sell Price) - ለአንድ ፍሬ</label>
+                <input type="number" id="inv-sell" placeholder="ለምሳሌ 350">
+              </div>
+              <button id="btn-add-inventory" class="btn-success">መዝግብ (Add Item)</button>
+           </div>
+           
+           <div class="glass-card full-width">
+              <h3>በስቶክ ውስጥ ያሉ እቃዎች</h3>
+              <div class="table-responsive">
+                <table class="status-table">
+                  <thead>
+                    <tr><th>ስም</th><th>አይነት</th><th>ብዛት</th><th>መግዣ</th><th>መሸጫ</th><th>ድርጊት</th></tr>
+                  </thead>
+                  <tbody id="inventory-list">
+                  </tbody>
+                </table>
+              </div>
+           </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Hidden Printable Area for Receipts -->
+    <div id="print-receipt-area" style="display: none; padding: 10px; background: white; color: black; border: 1px dotted #ccc;">
+       <h3 style="text-align: center; margin: 0; padding:0; margin-bottom: 5px;">Minish Beauty Salon</h3>
+       <p style="text-align: center; font-size: 10px; margin: 0; padding:0; margin-bottom: 10px;" id="print-date">Date</p>
+       <div id="print-content" style="font-size: 11px;"></div>
+       <p style="text-align: center; font-size: 10px; margin-top: 15px;">* Thanks for coming! *</p>
+    </div>
+
+  </div>
+
+  <div id="login-modal" class="modal-overlay hidden">
+    <div class="glass-card login-box">
+      <h3>የማናጀር ፈቃድ ያስፈልጋል</h3>
+      <div class="form-group">
+        <input type="password" id="manager-password" placeholder="የማለፊያ ኮድ (PIN)">
+      </div>
+      <button id="btn-admin-login" class="btn-success">ክፈት</button>
+      <button id="btn-admin-cancel" class="btn-danger mt-4 bg-transparent shadow-none" style="background:transparent; color: var(--text-muted); padding:0;">ተመለስ</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+>>>>>>> 9e7f09a (Upload Final Clean V5 Salon System (Resolved Secret Scanning))
