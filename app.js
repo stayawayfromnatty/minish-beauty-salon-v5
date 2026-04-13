@@ -518,7 +518,7 @@ function updateLeaderboard() {
     const expUI = document.getElementById('expense-list-mini');
     expUI.innerHTML = '';
     filteredExpenses.slice(0, 5).forEach(e => {
-        expUI.innerHTML += `<tr><td>${e.description}</td><td>${e.expense_type}</td><td>${e.amount}</td></tr>`;
+        expUI.innerHTML += `<tr><td>${e.description}</td><td>${e.expense_type}</td><td>${e.amount}</td><td><button onclick="deleteExpenseEntry('${e.id}')" class="btn-danger" style="padding:2px 8px;">X</button></td></tr>`;
     });
 }
 
@@ -549,6 +549,14 @@ async function deleteLogEntry(ts) {
     }
 }
 window.deleteLogEntry = deleteLogEntry;
+
+async function deleteExpenseEntry(id) {
+    if (confirm("ይህን ወጪ መሰረዝ ይፈልጋሉ?")) {
+        await sbFetch(`expenses?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+        loadData();
+    }
+}
+window.deleteExpenseEntry = deleteExpenseEntry;
 
 function renderCashierLogs() {
     const tbody = document.getElementById('today-logs-list');
