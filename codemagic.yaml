@@ -23,11 +23,20 @@ workflows:
         script: |
           npx cap add ios || true
           npx cap sync ios
+          # Verify the workspace exists
+          find . -name "*.xcworkspace"
 
       - name: Build unsigned IPA
         script: |
+          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+          if [ -z "$WORKSPACE" ]; then
+            echo "Error: Could not find .xcworkspace file"
+            exit 1
+          fi
+          echo "Found workspace at: $WORKSPACE"
+          
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -workspace "$WORKSPACE" \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
