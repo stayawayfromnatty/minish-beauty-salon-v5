@@ -224,6 +224,7 @@ const SERVICE_OPTIONS = {
     { text: "EYE BROW OMBRE (ሚኒሽ ስፔሻል)", value: "Ombre", price: 7000 },
     { text: "Eyebrow Razor (በምላጭ)", value: "Razor", price: 100 },
     { text: "Eyebrow Thread (በክር)", value: "Thread", price: 200 },
+    { text: "Eyebrow Heena (በሂና)", value: "Heena", price: 500 },
     { text: "Eyebrow Wax (በዋክስ)", value: "Wax", price: 300 },
     { text: "Facial Massage (የፊት ማሳጅ)", value: "Facial", price: 300 },
     { text: "Make up with eyelash", value: "MakeupLash", price: 3000 },
@@ -305,11 +306,25 @@ document.getElementById('active-employee-select').addEventListener('change', (e)
   uniqueOpts.forEach(opt => {
     serviceSelect.innerHTML += `<option value="${opt.value}" data-price="${opt.price || ''}">${opt.text}</option>`;
   });
+  serviceSelect.innerHTML += `<option value="Custom" data-price="">-- ሌላ ተጨማሪ ስራ (Custom) --</option>`;
 });
 
 document.getElementById('service-type').addEventListener('change', (e) => {
   const price = e.target.options[e.target.selectedIndex].getAttribute('data-price');
-  if (price) document.getElementById('service-price').value = price;
+  if (price) {
+    document.getElementById('service-price').value = price;
+  } else {
+    document.getElementById('service-price').value = '';
+  }
+  
+  const customGroup = document.getElementById('custom-service-group');
+  if (customGroup) {
+      if (e.target.value === 'Custom') {
+          customGroup.style.display = 'block';
+      } else {
+          customGroup.style.display = 'none';
+      }
+  }
 });
 
 // Session Management
@@ -340,7 +355,12 @@ document.getElementById('btn-add-to-session').addEventListener('click', () => {
     const price = parseFloat(document.getElementById('service-price').value) || 0;
     if (!empIdVal) return alert("ሰራተኛ ይምረጡ");
     const emp = employees.find(e => e.id === parseInt(empIdVal));
-    const service = document.getElementById('service-type').options[document.getElementById('service-type').selectedIndex].text;
+    
+    let service = document.getElementById('service-type').options[document.getElementById('service-type').selectedIndex].text;
+    if (document.getElementById('service-type').value === 'Custom') {
+        service = document.getElementById('custom-service-name').value;
+        if (!service) return alert("እባክዎ መጀመሪያ የልዩ ስራውን ስም ይፃፉ (Please enter the custom service name)");
+    }
 
     // Extras
     let final = price; let extras = [];
