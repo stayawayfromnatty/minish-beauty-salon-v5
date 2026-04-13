@@ -1,0 +1,65 @@
+workflows:
+  ios-build:
+    name: Minish Salon iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Install dependencies
+        script: npm install
+
+      - name: Prepare web assets
+        script: |
+          mkdir -p www
+          cp index.html app.js styles.css logo.jpeg confetti.browser.min.js www/
+          cp -r fonts www/ 2>/dev/null || true
+
+      - name: Add iOS platform (if not present)
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+
+      - name: Sync Capacitor
+        script: npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+
+      - name: Build unsigned IPA
+        script: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/App.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist ios_export_options.plist
+
+    artifacts:
+      - build/ipa/*.ipa
+      - build/ipa/*.xcarchive
+
+    publishing:
+      email:
+        recipients:
+          - placeholder@email.com
+        notify:
+          success: true
+          failure: true
