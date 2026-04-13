@@ -19,19 +19,10 @@ workflows:
           cp index.html app.js styles.css logo.jpeg confetti.browser.min.js www/
           cp -r fonts www/ 2>/dev/null || true
 
-      - name: Add iOS platform (if not present)
+      - name: Capacitor Sync
         script: |
-          if [ ! -d "ios" ]; then
-            npx cap add ios
-          fi
-
-      - name: Sync Capacitor
-        script: npx cap sync ios
-
-      - name: Install CocoaPods
-        script: |
-          cd ios/App
-          pod install
+          npx cap add ios || true
+          npx cap sync ios
 
       - name: Build unsigned IPA
         script: |
