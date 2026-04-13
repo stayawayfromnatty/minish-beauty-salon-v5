@@ -46,11 +46,11 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist ios_export_options.plist
+          # Manual IPA creation (unsigned)
+          mkdir -p build/ipa/Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app build/ipa/Payload/
+          cd build/ipa
+          zip -rk MinishSalon-unsigned.ipa Payload
 
     artifacts:
       - build/ipa/*.ipa
