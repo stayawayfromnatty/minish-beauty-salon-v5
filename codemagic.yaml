@@ -46,11 +46,11 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-          # Manual IPA creation (unsigned)
+          # Manual IPA creation (unsigned) - Fix: Removed -k flag
           mkdir -p build/ipa/Payload
           cp -r build/App.xcarchive/Products/Applications/App.app build/ipa/Payload/
           cd build/ipa
-          zip -rk MinishSalon-unsigned.ipa Payload
+          zip -r MinishSalon-unsigned.ipa Payload
 
     artifacts:
       - build/ipa/*.ipa
