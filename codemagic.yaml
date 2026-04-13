@@ -11,30 +11,37 @@ workflows:
 
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: |
+          npm install
+          npm install @capacitor/ios@latest
 
       - name: Prepare web assets
         script: |
           mkdir -p www
-          cp index.html app.js styles.css logo.jpeg confetti.browser.min.js www/
+          # Copy every web-relevant file to the distribution folder
+          cp index.html app.js styles.css logo.jpeg manifest.json confetti.browser.min.js www/
           cp -r fonts www/ 2>/dev/null || true
+          # List files for verification in logs
+          ls -R www
 
-      - name: Capacitor Sync
+      - name: Capacitor Setup
         script: |
           npx cap add ios || true
           npx cap sync ios
-          # Verify the workspace exists
-          find . -name "*.xcworkspace"
 
-      - name: Build unsigned IPA
+      - name: Build and Package
         script: |
+          # Use Capacitor CLI top-level sync to ensure native project is updated
+          npx cap update ios
+          
+          echo "Finding workspace..."
           WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
           if [ -z "$WORKSPACE" ]; then
-            echo "Error: Could not find .xcworkspace file"
+            echo "Error: Could not find .xcworkspace"
             exit 1
           fi
-          echo "Found workspace at: $WORKSPACE"
-          
+
+          echo "Building Archive..."
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme App \
@@ -46,10 +53,11 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-          # Manual IPA creation (unsigned) - Fix: Removed -k flag
+          echo "Creating Universal IPA..."
           mkdir -p build/ipa/Payload
           cp -r build/App.xcarchive/Products/Applications/App.app build/ipa/Payload/
           cd build/ipa
+          # The -r flag is recursive, NO -k (DOS) flag
           zip -r MinishSalon-unsigned.ipa Payload
 
     artifacts:

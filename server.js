@@ -105,11 +105,17 @@ app.post('/api/auth', async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// Static File Serving
-app.use(express.static(__dirname));
+// Static File Serving (Robust Pathing)
+const publicPath = path.resolve(__dirname);
+app.use(express.static(publicPath));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
+
+// Catch-all for SPA routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {

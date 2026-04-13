@@ -1,10 +1,23 @@
-<<<<<<< HEAD
+// --- Global Error Handler for Mobile Debugging ---
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  const message = [
+    'Message: ' + msg,
+    'URL: ' + url,
+    'Line: ' + lineNo,
+    'Column: ' + columnNo,
+    'Error object: ' + JSON.stringify(error)
+  ].join(' - ');
+  alert("APP CRASHED: " + message);
+  return false;
+};
+
 const employees = [
   { id: 1, name: "Sara (ሳራ)", role: "ማናጀር / ቀለም" },
-  { id: 2, name: "Kitrubel(ክሩቤል)", role: "ፀጉር አስተካካይ" },
-  { id: 3, name: "Yonas (ዮናስ)", role: "ፀጉር አስተካካይ" },
-  { id: 4, name: "Beti Black (ቤቲ ጥቁሯ)", role: "ቁጥርጥር / ሹሩባ" },
-  { id: 5, name: "Beti White (ቤቲ ነጯ)", role: "ቁጥርጥር / ሹሩባ" },
+  { id: 17, name: "Minish (ሚኒሽ)", role: "የሳሎኑ ባለቤት / ዋና ባለሙያ" },
+  { id: 2, name: "Kitrubel(ክሩቤል)", role: "ፀጉር አስተካካይ / ቅንድብ (Eyebrow)" },
+  { id: 3, name: "Yonas (ዮናስ)", role: "ፀጉር አስተካካይ / ቅንድብ (Eyebrow)" },
+  { id: 4, name: "Beti Black (ቤቲ ጥቁር)", role: "ቁጥርጥር / ሹሩባ" },
+  { id: 5, name: "Beti White (ቤቲ ነጭ)", role: "ቁጥርጥር / ሹሩባ" },
   { id: 6, name: "Barch (ባርች)", role: "ቁጥርጥር / ሹሩባ" },
   { id: 7, name: "Meri (ሜሪ)", role: "ሹሩባ / ሞሮኮ ባዝ" },
   { id: 8, name: "Helen (ሄለን)", role: "ቁጥርጥር / ሹሩባ" },
@@ -14,30 +27,119 @@ const employees = [
   { id: 12, name: "Seble (ሰብለ)", role: "ጥፍር አሰራር" },
   { id: 13, name: "Meseret (መሰረት)", role: "ጥፍር / ሽፋሽፍት" },
   { id: 14, name: "Hiwot (ህይወት)", role: "ሞሮኮ ባዝ" },
-  { id: 15, name: "Mamaru (ማማሩ)", role: "ሞሮኮ ባዝ" }
+  { id: 15, name: "Mamaru (ማማሩ)", role: "ሞሮኮ ባዝ" },
+  { id: 16, name: "New Employee (ኒው ኢምፕሎይ)", role: "ሹሩባ / ፀጉር ማጠቢያ" },
+  { id: 18, name: "Bemnet (ቤምነት)", role: "ቁጥርጥር / ሹሩባ" }
 ];
 
-const ADMIN_PIN = "1234";
+// --- Direct Supabase Connection (No PC server needed) ---
+const SUPABASE_URL = 'https://yvoqsgbiaihksdafryiw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2b3FzZ2JpYWloa3NkYWZyeWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDY2OTksImV4cCI6MjA5MTUyMjY5OX0.rfNbcEwy1jrBVE2WNrhxeaZUIHbbKN5BVQpRZAEV6e0';
+const SB_HEADERS = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` };
 
-let auditLogs = JSON.parse(localStorage.getItem('minish_logs_v4')) || [];
-let inventory = JSON.parse(localStorage.getItem('minish_inventory_v1')) || [];
-let isAdminAuthenticated = false;
-
-function saveData() {
-  localStorage.setItem('minish_logs_v4', JSON.stringify(auditLogs));
-  localStorage.setItem('minish_inventory_v1', JSON.stringify(inventory));
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...options, headers: { ...SB_HEADERS, ...(options.headers || {}) } });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+let auditLogs = [];
+let expensesList = [];
+let isAdminAuthenticated = false;
+let currentSession = [];
+
+async function loadData() {
+  try {
+    const [txRows, expRows] = await Promise.all([
+      sbFetch('transactions?order=timestamp.desc&select=*'),
+      sbFetch('expenses?order=timestamp.desc&select=*')
+    ]);
+
+    auditLogs = (txRows || []).map(t => ({
+      id: t.id, timestamp: new Date(t.timestamp).getTime(),
+      employeeId: t.employee_id, employeeName: t.employee_name,
+      service: t.service_desc, revenue: parseFloat(t.revenue) || 0,
+      paymentMethod: t.payment_method, customerName: t.customer_name,
+      points: t.points
+    }));
+
+    expensesList = (expRows || []).map(e => ({
+      id: e.id, amount: parseFloat(e.amount) || 0, description: e.description,
+      expense_type: e.expense_type, timestamp: new Date(e.timestamp).getTime()
+    }));
+
+    const dbStatus = document.getElementById('db-status');
+    if (dbStatus) dbStatus.innerHTML = '<span style="color: #10b981;">መረጃው ተገናኝቷል (Cloud Active)</span>';
+
+    populateSelects();
+    renderCashierLogs();
+    if (isAdminAuthenticated) updateLeaderboard();
+  } catch (err) {
+    console.error("Failed to load data:", err);
+    if (document.getElementById('db-status'))
+      document.getElementById('db-status').innerHTML = '<span style="color: #ef4444;">ግንኙነት የለም</span>';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', loadData);
+
+// Mobile Sidebar Toggle (Safe for iOS)
+function openSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && overlay) {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+  }
+}
+function closeSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && overlay) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  }
+}
+
+// Attach listeners safely
+document.addEventListener('DOMContentLoaded', () => {
+  const menuBtn = document.getElementById('floating-menu-btn');
+  const overlay = document.getElementById('sidebar-overlay');
+  
+  if (menuBtn) {
+    menuBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openSidebar();
+    });
+    // Add touchstart for faster response on iOS
+    menuBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        openSidebar();
+    }, {passive: false});
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+    overlay.addEventListener('touchstart', closeSidebar);
+  }
+});
+
+// Navigation Logic
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
+    closeSidebar();
     const targetId = e.currentTarget.getAttribute('data-target');
-    if (typeof closeMobileMenu === 'function') closeMobileMenu();
-    if ((targetId === 'manager-view' || targetId === 'inventory-view') && !isAdminAuthenticated) {
-      // Pass along the target to switch after auth
+    if (targetId === 'manager-view' && !isAdminAuthenticated) {
       document.getElementById('btn-admin-login').dataset.pendingTarget = targetId;
       document.getElementById('btn-admin-login').dataset.pendingBtnId = e.currentTarget.id;
       document.getElementById('login-modal').classList.remove('hidden');
-      return; 
+      return;
     }
     switchView(targetId, e.currentTarget);
   });
@@ -48,908 +150,376 @@ function switchView(targetId, btnElement) {
   btnElement.classList.add('active');
   document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
   document.getElementById(targetId).classList.add('active');
-  if(targetId === 'manager-view') updateLeaderboard();
+  if (targetId === 'manager-view') updateLeaderboard();
 }
 
-document.getElementById('btn-admin-login').addEventListener('click', (e) => {
-  const code = document.getElementById('manager-password').value;
-  if(code === ADMIN_PIN) {
-    isAdminAuthenticated = true;
-    document.getElementById('login-modal').classList.add('hidden');
-    document.getElementById('manager-password').value = '';
-    
-    const pendingTarget = e.currentTarget.dataset.pendingTarget || 'manager-view';
-    const pendingBtnId = e.currentTarget.dataset.pendingBtnId || 'nav-manager';
-    const btnManager = document.getElementById(pendingBtnId);
-    switchView(pendingTarget, btnManager);
-  } else {
-    alert("የተሳሳተ ኮድ ነው! እባክዎ እንደገና ይሞክሩ (Incorrect PIN).");
-    document.getElementById('manager-password').value = '';
-  }
+// Admin Auth (Supabase Secure)
+document.getElementById('btn-admin-login').addEventListener('click', async (e) => {
+  const loginBtn = document.getElementById('btn-admin-login');
+  const user = document.getElementById('login-user').value;
+  const password = document.getElementById('manager-password').value;
+  if (!password) return;
+
+  loginBtn.innerText = "በመግባት ላይ...";
+  loginBtn.disabled = true;
+
+  try {
+    const hash = await sha256(String(password));
+    const rows = await sbFetch(`users?username=eq.${encodeURIComponent(user)}&select=password_hash`);
+    const success = rows && rows.length > 0 && rows[0].password_hash === hash;
+    if (success) {
+      isAdminAuthenticated = true;
+      document.getElementById('login-modal').classList.add('hidden');
+      document.getElementById('manager-password').value = '';
+      switchView('manager-view', document.getElementById('nav-manager'));
+    } else {
+      alert("ስህተት የይለፍ ቃል!");
+    }
+  } catch (err) { console.error(err); alert("ግንኙነት አልተሳካም!"); }
+  finally { loginBtn.innerText = "Login"; loginBtn.disabled = false; }
 });
+
 document.getElementById('btn-admin-cancel').addEventListener('click', () => {
   document.getElementById('login-modal').classList.add('hidden');
-  document.getElementById('manager-password').value = '';
 });
 
-const mobileMenuBtn = document.getElementById('floating-menu-btn');
-const sidebar = document.getElementById('sidebar');
-const overlay = document.getElementById('sidebar-overlay');
-
-function closeMobileMenu() {
-  if (sidebar) sidebar.classList.remove('open');
-  if (overlay) overlay.classList.remove('open');
-}
-
-if (mobileMenuBtn && sidebar && overlay) {
-  mobileMenuBtn.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
-  });
-
-  overlay.addEventListener('click', closeMobileMenu);
-}
-
-
-function triggerConfetti() {
-  if (typeof confetti !== 'undefined') {
-    const duration = 2000; const end = Date.now() + duration;
-    (function frame() {
-      confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#D4AF37', '#10B981'] });
-      confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#D4AF37', '#10B981'] });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    }());
-  }
-}
-
+// POS Logic
 function populateSelects() {
   const employeeSelect = document.getElementById('active-employee-select');
-  employeeSelect.innerHTML = '<option value="">-- ሰራተኛውን ይምረጡ --</option>';
-  employees.forEach(emp => { employeeSelect.innerHTML += `<option value="${emp.id}">${emp.name} - ${emp.role}</option>`; });
-
-  const soldSelect = document.getElementById('product-sold-select');
-  const usedSelect = document.getElementById('product-used-select');
+  const washerSelect = document.getElementById('washer-employee-select');
+  if (employeeSelect) employeeSelect.innerHTML = '<option value="">-- ሰራተኛውን ይምረጡ --</option>';
+  if (washerSelect) washerSelect.innerHTML = '<option value="">-- ካለ ይምረጡ --</option>';
   
-  soldSelect.innerHTML = '<option value="">-- ምንም አልተሸጠም --</option>';
-  usedSelect.innerHTML = '<option value="">-- ምንም ዕቃ አልወጣም --</option>';
-
-  inventory.forEach(item => {
-    const outOfStockStr = item.qty <= 0 ? " (አልቋል)" : ` (${item.qty} ቀሪ)`;
-    const opt = `<option value="${item.id}" ${item.qty <= 0 ? 'disabled' : ''}>${item.name}${outOfStockStr} - ${item.sellPrice || 0} ብር</option>`;
-    if(item.type === 'Retail') soldSelect.innerHTML += opt;
-    else usedSelect.innerHTML += opt;
+  employees.forEach(emp => { 
+    const opt = `<option value="${emp.id}">${emp.name}</option>`;
+    if (employeeSelect) employeeSelect.innerHTML += opt; 
+    if (washerSelect) washerSelect.innerHTML += opt;
   });
 }
 
-document.getElementById('product-sold-select').addEventListener('change', (e) => {
-  document.getElementById('product-qty-group').classList.toggle('hidden', e.target.value === "");
+const SERVICE_OPTIONS = {
+  HAIR: [
+    { text: "Haircut (መቁረጥ)", value: "Haircut", price: 500 },
+    { text: "Simple Styling (ማበጠር)", value: "Styling", price: 300 },
+    { text: "Wave (ዌቭ)", value: "Wave", price: 500 },
+    { text: "Pubis (ፑቢስ)", value: "Pubis", price: 500 },
+    { text: "Sab Sab (ሳብ ሳብ)", value: "SabSab", price: 500 },
+    { text: "Peystra (ፔይስትራ)", value: "Peystra", price: 500 },
+    { text: "ካስክ (Kask)", value: "Kask", price: 400 }
+  ],
+  NAILS: [
+    { text: "Gel by Shilak", value: "GelShilak", price: 1500 },
+    { text: "Litef by Normal", value: "LitefNormal", price: 1000 },
+    { text: "Pedicure (የእግር ጥፍር)", value: "Pedicure", price: 1000 },
+    { text: "Manicure (የእጅ ጥፍር)", value: "Manicure", price: 500 }
+  ],
+  FACE: [
+    { text: "EYE BROW OMBRE", value: "Ombre", price: 7000 },
+    { text: "Eyebrow Wax", value: "Wax", price: 300 },
+    { text: "Make up", value: "Makeup", price: 2500 },
+    { text: "Eyelash Extension", value: "Eyelash", price: 2000 }
+  ],
+  SPA: [
+    { text: "Special Moroccan Bath", value: "SpecialMorocco", price: 3000 },
+    { text: "Normal Moroccan Bath", value: "NormalMorocco", price: 2500 }
+  ],
+  BRAID: [
+    { text: "Cornrows (ቁጥርጥር)", value: "Cornrows", price: 500 },
+    { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 }
+  ],
+  COLOR_WASH: [
+    { text: "Hair Color - Full", value: "ColorFull", price: 8000 },
+    { text: "Washing (ፀጉር ማጠብ)", value: "Washing", price: 200 }
+  ]
+};
+
+document.getElementById('active-employee-select').addEventListener('change', (e) => {
+  const empId = parseInt(e.target.value);
+  const emp = employees.find(emp => emp.id === empId);
+  const serviceSelect = document.getElementById('service-type');
+  serviceSelect.innerHTML = '<option value="">-- አገልግሎት ይምረጡ --</option>';
+  if (!emp) return;
+
+  let opts = [];
+  if (emp.id === 17) opts = [...Object.values(SERVICE_OPTIONS).flat()];
+  else if (emp.role.includes("ጥፍር")) opts = [...SERVICE_OPTIONS.NAILS];
+  else if (emp.role.includes("ሹሩባ")) opts = [...SERVICE_OPTIONS.BRAID];
+  else if (emp.role.includes("ሞሮኮ")) opts = [...SERVICE_OPTIONS.SPA];
+  else opts = [...SERVICE_OPTIONS.HAIR, ...SERVICE_OPTIONS.COLOR_WASH, ...SERVICE_OPTIONS.FACE];
+
+  opts.forEach(opt => {
+    serviceSelect.innerHTML += `<option value="${opt.value}" data-price="${opt.price || ''}">${opt.text}</option>`;
+  });
 });
-document.getElementById('product-used-select').addEventListener('change', (e) => {
-  document.getElementById('product-used-qty-group').classList.toggle('hidden', e.target.value === "");
+
+document.getElementById('service-type').addEventListener('change', (e) => {
+  const price = e.target.options[e.target.selectedIndex].getAttribute('data-price');
+  if (price) document.getElementById('service-price').value = price;
 });
 
-// --- CASHIER POS LOGIC ---
-document.getElementById('btn-log-service').addEventListener('click', () => {
-  const empIdVal = document.getElementById('active-employee-select').value;
-  if(!empIdVal) {
-    alert("እባክዎ የተገለገሉበትን ሰራተኛ ስም ይምረጡ! (Please select an employee)");
-    return;
-  }
+// Session Management
+function renderSessionList() {
+  const container = document.getElementById('session-list-container');
+  const list = document.getElementById('session-items');
+  const totalDisplay = document.getElementById('session-total');
+  if (currentSession.length === 0) { container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  list.innerHTML = '';
+  let total = 0;
+  currentSession.forEach((item, index) => {
+    total += item.revenue;
+    const div = document.createElement('div');
+    div.className = 'session-item fade-in';
+    div.innerHTML = `
+      <div class="session-info"><strong>${item.service}</strong><br/><small>${item.employeeName} | ${item.revenue} ብር</small></div>
+      <div class="session-remove" onclick="removeFromSession(${index})">X</div>
+    `;
+    list.appendChild(div);
+  });
+  totalDisplay.innerText = total.toLocaleString() + " ብር";
+}
+window.removeFromSession = (idx) => { currentSession.splice(idx, 1); renderSessionList(); };
 
-  const empId = parseInt(empIdVal);
-  const emp = employees.find(e => e.id === empId);
+document.getElementById('btn-add-to-session').addEventListener('click', () => {
+    const empIdVal = document.getElementById('active-employee-select').value;
+    const price = parseFloat(document.getElementById('service-price').value) || 0;
+    if (!empIdVal) return alert("ሰራተኛ ይምረጡ");
+    const emp = employees.find(e => e.id === parseInt(empIdVal));
+    const service = document.getElementById('service-type').options[document.getElementById('service-type').selectedIndex].text;
 
-  const customerName = document.getElementById('customer-name').value || 'ስም የሌለው';
-  const serviceTypeElem = document.getElementById('service-type');
-  const serviceType = serviceTypeElem.options[serviceTypeElem.selectedIndex].text;
-  
-  const paymentMethod = document.getElementById('payment-method').value; // Cash or Bank
-  const servicePrice = parseFloat(document.getElementById('service-price').value) || 0;
-  
-  const soldId = document.getElementById('product-sold-select').value;
-  let productName = "";
-  let productPrice = 0;
-  let productSoldQty = 0;
-  
-  const usedId = document.getElementById('product-used-select').value;
-  let usedName = "";
-  let productUsedQty = 0;
+    // Extras
+    let final = price; let extras = [];
+    if (document.getElementById('use-shampoo').checked) { final += 50; extras.push("ሻምፖ"); }
+    if (document.getElementById('use-conditioner').checked) { final += 50; extras.push("ኮንዲሽነር"); }
+    const pg = parseInt(document.getElementById('placenta-glass-qty').value) || 0;
+    if (document.getElementById('use-placenta-glass').checked && pg > 0) { final += 100 * pg; extras.push(`ፕላሴንታ(ብ) x${pg}`); }
+    const wig = parseInt(document.getElementById('salon-wig-qty').value) || 0;
+    if (wig > 0) { final += 300 * wig; extras.push(`ዊግ x${wig}`); }
 
-  if(soldId) {
-    const itemInfo = inventory.find(i => i.id === soldId);
-    if(itemInfo) {
-      productSoldQty = parseInt(document.getElementById('product-sold-qty').value) || 1;
-      if(productSoldQty > itemInfo.qty) return alert("በስቶክ ውስጥ በቂ ዕቃ የለም! (Not enough retail stock)");
-      productName = itemInfo.name;
-      productPrice = itemInfo.sellPrice * productSoldQty;
-      
-      // Deduct stock
-      itemInfo.qty -= productSoldQty;
+    currentSession.push({
+        employeeId: emp.id, employeeName: emp.name, revenue: final, points: 100,
+        service: service + (extras.length ? ` (+${extras.join(", ")})` : "")
+    });
+
+    const washerId = document.getElementById('washer-employee-select').value;
+    if (washerId) {
+        const washer = employees.find(e => e.id === parseInt(washerId));
+        currentSession.push({ employeeId: washer.id, employeeName: washer.name, revenue: 0, points: 50, service: "ጥበቃ (Credit)" });
     }
-  }
 
-  if(usedId) {
-    const itemInfo = inventory.find(i => i.id === usedId);
-    if(itemInfo) {
-      productUsedQty = parseInt(document.getElementById('product-used-qty').value) || 1;
-      if(productUsedQty > itemInfo.qty) return alert("በስቶክ ውስጥ በቂ መገልገያ ዕቃ የለም! (Not enough internal stock)");
-      usedName = itemInfo.name;
-      
-      // Deduct stock
-      itemInfo.qty -= productUsedQty;
+    renderSessionList();
+    document.getElementById('service-price').value = '';
+    [...document.querySelectorAll('input[type="checkbox"]')].forEach(el => el.checked = false);
+});
+
+document.getElementById('btn-add-custom').addEventListener('click', () => {
+  const name = document.getElementById('custom-item-name').value;
+  const price = parseFloat(document.getElementById('custom-item-price').value) || 0;
+  if (!name || price <= 0) return;
+  currentSession.push({ employeeId: 0, employeeName: "ሽያጭ", service: name, revenue: price, points: 0 });
+  document.getElementById('custom-item-name').value = '';
+  document.getElementById('custom-item-price').value = '';
+  renderSessionList();
+});
+
+document.getElementById('btn-finish-session').addEventListener('click', async () => {
+    if (currentSession.length === 0) return;
+    const customer = document.getElementById('customer-name').value || "ደባሪያ";
+    const payment = document.getElementById('payment-method').value;
+    const tip = parseFloat(document.getElementById('tip-amount').value) || 0;
+    const ts = Date.now();
+
+    const logs = currentSession.map(item => ({ ...item, customerName: customer, paymentMethod: payment, timestamp: ts }));
+    if (tip > 0) logs.push({ employeeId: 0, employeeName: "ሳሎን", service: "Tip (ጉርሻ)", revenue: tip, customerName: customer, paymentMethod: payment, timestamp: ts });
+
+    try {
+        const rows = logs.map(item => ({
+            employee_id: item.employeeId, employee_name: item.employeeName,
+            service_desc: item.service, revenue: item.revenue,
+            payment_method: item.paymentMethod, customer_name: item.customerName,
+            points: item.points || 0,
+            timestamp: new Date(item.timestamp).toISOString()
+        }));
+        await sbFetch('transactions', { method: 'POST', body: JSON.stringify(rows), headers: { 'Prefer': 'return=minimal' } });
+        currentSession = []; document.getElementById('customer-name').value = ''; document.getElementById('tip-amount').value = '0';
+        renderSessionList(); loadData(); alert("ተመዝግቧል!");
+    } catch (e) { console.error(e); alert("መመዝገብ አልተቻለም"); }
+});
+
+// Manager & Financial Restoration
+function updateLeaderboard() {
+    const filter = document.getElementById('manager-date-filter').value;
+    const now = new Date();
+    const filteredLogs = auditLogs.filter(log => {
+        const d = new Date(log.timestamp);
+        if (filter === 'today') return d.toDateString() === now.toDateString();
+        
+        if (filter === 'yesterday') {
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            return d.toDateString() === yesterday.toDateString();
+        }
+
+        if (filter === 'specific') {
+            const specDate = document.getElementById('manager-specific-date').value;
+            return d.toISOString().split('T')[0] === specDate;
+        }
+
+        if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
+        if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return true;
+    });
+
+    const filteredExpenses = expensesList.filter(e => {
+        const d = new Date(e.timestamp);
+        if (filter === 'today') return d.toDateString() === now.toDateString();
+        
+        if (filter === 'yesterday') {
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            return d.toDateString() === yesterday.toDateString();
+        }
+
+        if (filter === 'specific') {
+            const specDate = document.getElementById('manager-specific-date').value;
+            return d.toISOString().split('T')[0] === specDate;
+        }
+
+        if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
+        if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return true;
+    });
+
+    let totalRev = 0; let cashRev = 0; let bankRev = 0;
+    filteredLogs.forEach(l => {
+        totalRev += l.revenue;
+        if (l.paymentMethod === 'Bank') bankRev += l.revenue; else cashRev += l.revenue;
+    });
+
+    const totalExp = filteredExpenses.reduce((a, c) => a + (parseFloat(c.amount) || 0), 0);
+    const netProfit = (totalRev / 1.15) - totalExp;
+
+    document.getElementById('stat-total-revenue').innerText = "ብር " + totalRev.toLocaleString();
+    document.getElementById('stat-net-profit').innerText = "ብር " + Math.round(netProfit).toLocaleString();
+    document.getElementById('stat-cash-revenue').innerText = "ብር " + (cashRev - totalExp).toLocaleString();
+    document.getElementById('stat-bank-revenue').innerText = "ብር " + bankRev.toLocaleString();
+
+    // Dual Leaderboards
+    const earners = {}; const workers = {};
+    employees.forEach(e => { earners[e.id] = { name: e.name, val: 0 }; workers[e.id] = { name: e.name, val: 0 }; });
+
+    filteredLogs.forEach(l => {
+        if (earners[l.employeeId]) earners[l.employeeId].val += l.revenue;
+        if (workers[l.employeeId]) workers[l.employeeId].val += (l.points || 0);
+    });
+
+    const earnersUI = document.getElementById('leaderboard-list-earners');
+    const workersUI = document.getElementById('leaderboard-list-workers');
+    earnersUI.innerHTML = ''; workersUI.innerHTML = '';
+
+    Object.values(earners).sort((a,b)=>b.val - a.val).slice(0, 5).forEach((s, i) => {
+        earnersUI.innerHTML += `<li><span class="rank-idx">#${i+1}</span> ${s.name} - ${s.val} ብር</li>`;
+    });
+    Object.values(workers).sort((a,b)=>b.val - a.val).slice(0, 5).forEach((s, i) => {
+        workersUI.innerHTML += `<li><span class="rank-idx">#${i+1}</span> ${s.name} - ${s.val} Pts</li>`;
+    });
+
+    // History Table
+    const historyUI = document.getElementById('manager-audit-log-list');
+    historyUI.innerHTML = '';
+    filteredLogs.sort((a,b)=>b.timestamp - a.timestamp).slice(0, 50).forEach(l => {
+        const vat = Math.round(l.revenue - (l.revenue / 1.15));
+        historyUI.innerHTML += `<tr>
+            <td>${new Date(l.timestamp).toLocaleDateString()}</td>
+            <td>${l.employeeName}</td>
+            <td>${l.paymentMethod==='Bank'?'ባንክ':'ጥሬ'}</td>
+            <td>${l.revenue}</td>
+            <td>${vat}</td>
+            <td><button onclick="deleteLogEntry(${l.timestamp})" class="btn-danger" style="padding:2px 8px;">X</button></td>
+        </tr>`;
+    });
+
+    // Simple Expense List
+    const expUI = document.getElementById('expense-list-mini');
+    expUI.innerHTML = '';
+    filteredExpenses.slice(0, 5).forEach(e => {
+        expUI.innerHTML += `<tr><td>${e.description}</td><td>${e.expense_type}</td><td>${e.amount}</td></tr>`;
+    });
+}
+
+// Expense (Wechi) Actions
+document.getElementById('btn-add-expense').addEventListener('click', async () => {
+    const amount = parseFloat(document.getElementById('expense-amount').value);
+    const desc = document.getElementById('expense-description').value;
+    const type = document.getElementById('expense-type').value;
+    if (!amount || !desc) return alert("መረጃ ይሙሉ");
+
+    try {
+        await sbFetch('expenses', {
+            method: 'POST',
+            body: JSON.stringify({ amount, description: desc, expense_type: type }),
+            headers: { 'Prefer': 'return=minimal' }
+        });
+        document.getElementById('expense-amount').value = '';
+        document.getElementById('expense-description').value = '';
+        loadData(); alert("ወጪ ተመዝግቧል");
+    } catch(e) { console.error(e); alert("መመዝገብ አልተቻለም"); }
+});
+
+async function deleteLogEntry(ts) {
+    if (confirm("ይሰረዝ?")) {
+        const isoTs = new Date(ts).toISOString();
+        await sbFetch(`transactions?timestamp=eq.${encodeURIComponent(isoTs)}`, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+        loadData();
     }
-  }
+}
+window.deleteLogEntry = deleteLogEntry;
 
-  const totalRevenue = servicePrice + productPrice;
+function renderCashierLogs() {
+    const tbody = document.getElementById('today-logs-list');
+    tbody.innerHTML = '';
+    auditLogs.sort((a,b)=>b.timestamp-a.timestamp).slice(0, 15).forEach(log => {
+        const time = new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        tbody.innerHTML += `<tr><td>${time}</td><td>${log.paymentMethod==='Bank'?'ባንክ':'ጥሬ'}</td><td>${log.employeeName}</td><td>${log.revenue}</td></tr>`;
+    });
+}
 
-  if (totalRevenue <= 0 && !usedId) {
-    alert("እባክዎ ክፍያውን ያስገቡ ወይንም መገልገያ ዕቃ መውጣቱን ያሳውቁ! (Enter amount or select used item)");
-    return;
-  }
-
-  const isTaxed = document.getElementById('tax-receipt-toggle').checked;
-
-  const newLog = {
-    customerName: customerName,
-    employeeId: emp.id,
-    employeeName: emp.name,
-    service: serviceType,
-    servicePrice: servicePrice,
-    productName: productName,
-    productSoldQty: productSoldQty,
-    productPrice: productPrice,
-    usedName: usedName,
-    productUsedQty: productUsedQty,
-    revenue: totalRevenue,
-    paymentMethod: paymentMethod,
-    isTaxed: isTaxed,
-    timestamp: new Date().getTime()
-  };
-  
-  auditLogs.push(newLog);
-
-  document.getElementById('customer-name').value = '';
-  document.getElementById('service-price').value = '';
-  document.getElementById('product-sold-select').value = '';
-  document.getElementById('product-sold-qty').value = '1';
-  document.getElementById('product-qty-group').classList.add('hidden');
-  document.getElementById('product-used-select').value = '';
-  document.getElementById('product-used-qty').value = '1';
-  document.getElementById('product-used-qty-group').classList.add('hidden');
-  document.getElementById('active-employee-select').value = '';
-  document.getElementById('tax-receipt-toggle').checked = false;
-
-  saveData();
-  populateSelects(); // Rebuild select options with new qty
-  renderInventory(); // Update inventory table
-  renderCashierLogs();
-  updateLeaderboard();
-  triggerConfetti();
-  
-  setTimeout(() => {
-    alert(`የ ${totalRevenue} ብር ክፍያ በ${paymentMethod === 'Cash' ? 'ጥሬ ገንዘብ' : 'ባንክ'} በተሳካ ሁኔታ ተመዝግቧል!`);
-  }, 100);
+// Export & Print
+document.getElementById('btn-export-csv').addEventListener('click', () => {
+    let csv = "Date,Employee,Method,Revenue,VAT\n";
+    auditLogs.forEach(l => csv += `${new Date(l.timestamp).toLocaleDateString()},${l.employeeName},${l.paymentMethod},${l.revenue},${Math.round(l.revenue*0.13)}\n`);
+    const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8,\uFEFF" + csv)); link.setAttribute("download", "Minish_Report.csv"); link.click();
 });
 
 document.getElementById('btn-print-last').addEventListener('click', () => {
-  if(auditLogs.length === 0) return alert("እስካሁን ምንም ሪከርድ የለም (No record recorded to print)");
-  const last = auditLogs[auditLogs.length - 1]; // get latest
-  
-  const pArea = document.getElementById('print-receipt-area');
-  document.getElementById('print-date').innerText = new Date(last.timestamp).toLocaleString();
-  let itemsHtml = `<b>Service:</b> ${last.service} (${last.servicePrice} ETB) <br/>`;
-  if(last.productName) itemsHtml += `<b>Product:</b> ${last.productName} (${last.productPrice} ETB) <br/>`;
-  itemsHtml += `<h4 style="margin:5px 0;">TOTAL: ${last.revenue} ETB</h4>`;
-  itemsHtml += `<div><b>Paid:</b> ${last.paymentMethod}</div>`;
-  itemsHtml += `<div><b>Stylist:</b> ${last.employeeName}</div>`;
-  
-  document.getElementById('print-content').innerHTML = itemsHtml;
-  pArea.style.display = 'block'; // Make it available to DOM before print
-  window.print();
-  pArea.style.display = 'none'; // hide it back so screen stays clean
-});
-
-function renderCashierLogs() {
-  const tbody = document.getElementById('today-logs-list');
-  tbody.innerHTML = '';
-  if(auditLogs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">በአሁኑ ሰዓት ማንም የተከፈለለት ደንበኛ የለም.</td></tr>`;
-    return;
-  }
-  
-  const recentLogs = [...auditLogs].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
-  
-  recentLogs.forEach((q, idx) => {
-    const delay = idx * 0.05;
-    const dateStr = new Date(q.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    const actionsStr = [q.service, q.productName].filter(Boolean).join(" ተገዝቷል፣ ");
-    const paymentBadgeColor = q.paymentMethod === 'Bank' ? '#3B82F6' : '#10B981';
-    const taxBadge = q.isTaxed 
-      ? '<span class="status-badge" style="background:#059669; color:white;">✓ አለው</span>'
-      : '<span class="status-badge" style="background:#DC2626; color:white;">✕ አላረፈም</span>';
-
-    tbody.innerHTML += `
-      <tr class="slide-in-right" style="animation-delay: ${delay}s">
-        <td style="color: var(--text-muted);">${dateStr}</td>
-        <td><span class="status-badge" style="background:${paymentBadgeColor}; color:white;">${q.paymentMethod === 'Bank' ? 'ባንክ' : 'ጥሬ'}</span></td>
-        <td style="font-weight: bold; color: var(--accent-gold);">${q.employeeName}</td>
-        <td style="font-size:0.9em">${actionsStr}</td>
-        <td style="color: var(--success); font-weight:bold;">ብር ${q.revenue}</td>
-        <td>${taxBadge}</td>
-      </tr>
+    if (auditLogs.length === 0) return;
+    const l = auditLogs[auditLogs.length - 1];
+    document.getElementById('print-date').innerText = new Date(l.timestamp).toLocaleString();
+    document.getElementById('print-content').innerHTML = `
+        <div style="border-bottom: 1px dashed #000; padding: 10px 0;">
+            <b>Employee:</b> ${l.employeeName}<br/>
+            <b>Client:</b> ${l.customerName}<br/>
+            <b>Service:</b> ${l.service}
+        </div>
+        <div style="font-size: 1.2rem; text-align: right; margin-top: 10px;">
+            <b>TOTAL: ${l.revenue} ብር</b>
+        </div>
     `;
-  });
-}
+    const area = document.getElementById('print-receipt-area');
+    area.style.display = 'block'; window.print(); area.style.display = 'none';
+});
 
-// --- MANAGER LOGIC / HISTORY FILTERING ---
-document.getElementById('manager-date-filter').addEventListener('change', updateLeaderboard);
-
-function getFilteredLogs() {
-  const filter = document.getElementById('manager-date-filter').value;
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const dayOfWeek = now.getDay() || 7; 
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 1).getTime();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-
-  return auditLogs.filter(log => {
-    if(filter === 'today') return log.timestamp >= startOfDay;
-    if(filter === 'week') return log.timestamp >= startOfWeek;
-    if(filter === 'month') return log.timestamp >= startOfMonth;
-    if(filter === 'year') return log.timestamp >= startOfYear;
-    return true; // "all"
-  });
-}
-
-function updateLeaderboard() {
-  const logsToProcess = getFilteredLogs();
-  
-  let totalRevenueReal = 0;
-  let taxedRevenue = 0;
-  let internalRevenue = 0;
-  let cashRevenue = 0;
-  let bankRevenue = 0;
-
-  const stats = {};
-  employees.forEach(e => { stats[e.id] = { name: e.name, role: e.role, score: 0, revenue: 0 }; });
-  
-  logsToProcess.forEach(log => { 
-    totalRevenueReal += (log.revenue || 0);
-
-    if (log.isTaxed) taxedRevenue += (log.revenue || 0);
-    else internalRevenue += (log.revenue || 0);
-
-    if (log.paymentMethod === 'Bank') bankRevenue += (log.revenue || 0);
-    else cashRevenue += (log.revenue || 0);
-
-    if(stats[log.employeeId]) {
-      stats[log.employeeId].score += 1; 
-      stats[log.employeeId].revenue += (log.revenue || 0);
+// Filter & Specific Date Listeners
+document.getElementById('manager-date-filter').addEventListener('change', (e) => {
+    const specInput = document.getElementById('manager-specific-date');
+    if (e.target.value === 'specific') {
+        specInput.classList.remove('hidden');
+    } else {
+        specInput.classList.add('hidden');
+        updateLeaderboard();
     }
-  });
-
-  document.getElementById('stat-total-revenue').innerText = "ብር " + totalRevenueReal.toLocaleString(); 
-  document.getElementById('stat-taxed-revenue').innerText = "ብር " + taxedRevenue.toLocaleString(); 
-  document.getElementById('stat-internal-revenue').innerText = "ብር " + internalRevenue.toLocaleString(); 
-  document.getElementById('stat-cash-revenue').innerText = "ብር " + cashRevenue.toLocaleString(); 
-  document.getElementById('stat-bank-revenue').innerText = "ብር " + bankRevenue.toLocaleString(); 
-  
-  const sortedStats = Object.values(stats).sort((a, b) => b.revenue - a.revenue);
-  
-  const lbUI = document.getElementById('leaderboard-list');
-  lbUI.innerHTML = '';
-  sortedStats.slice(0, 10).forEach((emp, index) => {
-    const delay = index * 0.05;
-    const isRankClass = index < 3 ? `rank-${index + 1}` : '';
-    lbUI.innerHTML += `<li class="${isRankClass} slide-in-right" style="animation-delay: ${delay}s"><span class="rank-idx">#${index + 1}</span><div class="rank-name">${emp.name}<span class="rank-role">${emp.role} (የሰራው: ${emp.score})</span></div><div class="rank-score">★ ብር ${emp.revenue.toLocaleString()}</div></li>`;
-  });
-
-  const auditUI = document.getElementById('manager-audit-log-list');
-  auditUI.innerHTML = '';
-  if (logsToProcess.length === 0) {
-    auditUI.innerHTML = `<tr><td colspan="5" class="empty-state">ምንም የተመዘገበ ስራ የለም (No entries for selected filter).</td></tr>`;
-  } else {
-    const recentLogs = [...logsToProcess].sort((a,b) => b.timestamp - a.timestamp);
-    recentLogs.forEach((log, idx) => {
-      const delay = idx * 0.05;
-      const dateStr = new Date(log.timestamp).toLocaleDateString() + ' ' + new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      const taxStatus = log.isTaxed ? "✓" : "✕";
-      const taxColor = log.isTaxed ? "color: var(--success);" : "color: var(--danger);";
-      const payStatus = log.paymentMethod === 'Bank' ? "ባንክ" : "ጥሬ ገንዘብ";
-      const payColor = log.paymentMethod === 'Bank' ? "#3B82F6" : "#10B981";
-
-      auditUI.innerHTML += `<tr class="slide-in-right" style="animation-delay: ${delay}s"><td style="color: var(--text-muted);">${dateStr}</td><td>${log.employeeName}</td><td><span style="color:${payColor}; border:1px solid ${payColor}; border-radius:12px; padding:2px 8px; font-size:0.8em">${payStatus}</span></td><td style="color: var(--success); font-weight:bold;">ብር ${log.revenue}</td><td style="${taxColor}">${taxStatus}</td></tr>`;
-    });
-  }
-}
-
-// CSV EXPORT LOGIC
-document.getElementById('btn-export-csv').addEventListener('click', () => {
-  const logsToProcess = getFilteredLogs();
-  if(logsToProcess.length === 0) return alert("ኤክስፖርት የሚደረግ ምንም የተመዘገበ ሪከርድ የለም (No data to export).");
-  
-  let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-  csvContent += "Date,Time,Customer Name,Employee,Service,Retail Product,Retail Qty,Used Internal Product,Used Qty,Service Fee,Product Fee,Total Paid,Payment Method,Is Official Receipt(Taxed)\n";
-  
-  logsToProcess.forEach(row => {
-    let d = new Date(row.timestamp);
-    let dateStr = d.toLocaleDateString('en-GB'); 
-    let timeStr = d.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'});
-    let pMethod = row.paymentMethod || "Cash";
-    let isTaxedStr = row.isTaxed ? "Taxed (Official)" : "Internal (Untaxed)";
-    
-    let safeCustomerName = row.customerName ? row.customerName.replace(/,/g, "") : "";
-    let safeService = row.service ? row.service.replace(/,/g, "-") : "";
-    let safeProduct = row.productName ? row.productName.replace(/,/g, "-") : "";
-    let safeUsed = row.usedName ? row.usedName.replace(/,/g, "-") : "";
-    
-    csvContent += `"${dateStr}","${timeStr}","${safeCustomerName}","${row.employeeName}","${safeService}","${safeProduct}",${row.productSoldQty||0},"${safeUsed}",${row.productUsedQty||0},${row.servicePrice||0},${row.productPrice||0},${row.revenue},"${pMethod}","${isTaxedStr}"\n`;
-  });
-  
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `Minish_Salon_Report_${new Date().toLocaleDateString('en-GB').replace(/\//g,'-')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 });
 
-// Remove destructive Clear Data button completely!
-const btnClear = document.getElementById('btn-clear-data');
-if(btnClear) btnClear.remove();
-
-document.getElementById('inv-type').addEventListener('change', (e) => {
-  const isRetail = e.target.value === 'Retail';
-  document.getElementById('inv-sell-group').style.display = isRetail ? 'block' : 'none';
+document.getElementById('manager-specific-date').addEventListener('change', () => {
+    updateLeaderboard();
 });
-
-document.getElementById('btn-add-inventory').addEventListener('click', () => {
-  const name = document.getElementById('inv-name').value.trim();
-  const type = document.getElementById('inv-type').value;
-  const qty = parseInt(document.getElementById('inv-qty').value) || 0;
-  const buyPrice = parseFloat(document.getElementById('inv-buy').value) || 0;
-  const sellPrice = type === 'Retail' ? (parseFloat(document.getElementById('inv-sell').value) || 0) : 0;
-
-  if(!name || qty <= 0 || buyPrice <= 0) return alert("እባክዎ ሙሉ መረጃ ያስገቡ! (Please enter valid details)");
-
-  inventory.push({ 
-    id: "item_" + new Date().getTime(), 
-    name, type, qty, buyPrice, sellPrice, 
-    addedAt: new Date().getTime() 
-  });
-
-  document.getElementById('inv-name').value = '';
-  document.getElementById('inv-qty').value = '';
-  document.getElementById('inv-buy').value = '';
-  document.getElementById('inv-sell').value = '';
-
-  saveData();
-  renderInventory();
-  populateSelects();
-  alert("እቃው በተሳካ ሁኔታ ተመዝግቧል! (Item added successfully!)");
-});
-
-function deleteInventory(id) {
-  if(confirm("ይህ እቃ ይሰረዝ? (Delete this item?)")) {
-    inventory = inventory.filter(i => i.id !== id);
-    saveData();
-    renderInventory();
-    populateSelects();
-  }
-}
-
-// Ensure this function is globally accessible
-window.deleteInventory = deleteInventory;
-
-function renderInventory() {
-  const list = document.getElementById('inventory-list');
-  if(!list) return;
-  list.innerHTML = '';
-  if(inventory.length === 0) {
-    list.innerHTML = `<tr><td colspan="6" class="empty-state">ምንም የተመዘገበ ዕቃ የለም (No items in inventory).</td></tr>`;
-    return;
-  }
-  
-  inventory.forEach(item => {
-    let warningStyle = item.qty < 5 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--success);';
-    let typeBadge = item.type === 'Retail' 
-      ? '<span class="status-badge" style="background:var(--accent-gold); color:#000;">ለሽያጭ</span>'
-      : '<span class="status-badge" style="background:#3B82F6; color:#fff;">መገልገያ</span>';
-      
-    list.innerHTML += `
-      <tr>
-        <td style="font-weight:bold;">${item.name}</td>
-        <td>${typeBadge}</td>
-        <td style="${warningStyle}">${item.qty} ፍሬ</td>
-        <td>ብር ${item.buyPrice}</td>
-        <td>${item.type === 'Retail' ? 'ብር ' + item.sellPrice : '-'}</td>
-        <td><button onclick="window.deleteInventory('${item.id}')" class="btn-danger" style="padding: 5px 10px; width:auto; font-size:0.8rem;">ሰርዝ (X)</button></td>
-      </tr>
-    `;
-  });
-}
-
-populateSelects();
-renderCashierLogs();
-updateLeaderboard();
-renderInventory();
-=======
-const employees = [
-  { id: 1, name: "Sara (ሳራ)", role: "ማናጀር / ቀለም" },
-  { id: 2, name: "Kitrubel(ክሩቤል)", role: "ፀጉር አስተካካይ" },
-  { id: 3, name: "Yonas (ዮናስ)", role: "ፀጉር አስተካካይ" },
-  { id: 4, name: "Beti Black (ቤቲ ጥቁሯ)", role: "ቁጥርጥር / ሹሩባ" },
-  { id: 5, name: "Beti White (ቤቲ ነጯ)", role: "ቁጥርጥር / ሹሩባ" },
-  { id: 6, name: "Barch (ባርች)", role: "ቁጥርጥር / ሹሩባ" },
-  { id: 7, name: "Meri (ሜሪ)", role: "ሹሩባ / ሞሮኮ ባዝ" },
-  { id: 8, name: "Helen (ሄለን)", role: "ቁጥርጥር / ሹሩባ" },
-  { id: 9, name: "Mekdes (መቅደስ)", role: "ጥፍር አሰራር" },
-  { id: 10, name: "Selam (ሰላም)", role: "ጥፍር / ፀጉር አጣቢ" },
-  { id: 11, name: "Christi (ክርስቲ)", role: "ጥፍር አሰራር" },
-  { id: 12, name: "Seble (ሰብለ)", role: "ጥፍር አሰራር" },
-  { id: 13, name: "Meseret (መሰረት)", role: "ጥፍር / ሽፋሽፍት" },
-  { id: 14, name: "Hiwot (ህይወት)", role: "ሞሮኮ ባዝ" },
-  { id: 15, name: "Mamaru (ማማሩ)", role: "ሞሮኮ ባዝ" }
-];
-
-const ADMIN_PIN = "1234";
-
-let auditLogs = JSON.parse(localStorage.getItem('minish_logs_v4')) || [];
-let inventory = JSON.parse(localStorage.getItem('minish_inventory_v1')) || [];
-let isAdminAuthenticated = false;
-
-function saveData() {
-  localStorage.setItem('minish_logs_v4', JSON.stringify(auditLogs));
-  localStorage.setItem('minish_inventory_v1', JSON.stringify(inventory));
-}
-
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    const targetId = e.currentTarget.getAttribute('data-target');
-    if (typeof closeMobileMenu === 'function') closeMobileMenu();
-    if ((targetId === 'manager-view' || targetId === 'inventory-view') && !isAdminAuthenticated) {
-      // Pass along the target to switch after auth
-      document.getElementById('btn-admin-login').dataset.pendingTarget = targetId;
-      document.getElementById('btn-admin-login').dataset.pendingBtnId = e.currentTarget.id;
-      document.getElementById('login-modal').classList.remove('hidden');
-      return; 
-    }
-    switchView(targetId, e.currentTarget);
-  });
-});
-
-function switchView(targetId, btnElement) {
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  btnElement.classList.add('active');
-  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-  document.getElementById(targetId).classList.add('active');
-  if(targetId === 'manager-view') updateLeaderboard();
-}
-
-document.getElementById('btn-admin-login').addEventListener('click', (e) => {
-  const code = document.getElementById('manager-password').value;
-  if(code === ADMIN_PIN) {
-    isAdminAuthenticated = true;
-    document.getElementById('login-modal').classList.add('hidden');
-    document.getElementById('manager-password').value = '';
-    
-    const pendingTarget = e.currentTarget.dataset.pendingTarget || 'manager-view';
-    const pendingBtnId = e.currentTarget.dataset.pendingBtnId || 'nav-manager';
-    const btnManager = document.getElementById(pendingBtnId);
-    switchView(pendingTarget, btnManager);
-  } else {
-    alert("የተሳሳተ ኮድ ነው! እባክዎ እንደገና ይሞክሩ (Incorrect PIN).");
-    document.getElementById('manager-password').value = '';
-  }
-});
-document.getElementById('btn-admin-cancel').addEventListener('click', () => {
-  document.getElementById('login-modal').classList.add('hidden');
-  document.getElementById('manager-password').value = '';
-});
-
-const mobileMenuBtn = document.getElementById('floating-menu-btn');
-const sidebar = document.getElementById('sidebar');
-const overlay = document.getElementById('sidebar-overlay');
-
-function closeMobileMenu() {
-  if (sidebar) sidebar.classList.remove('open');
-  if (overlay) overlay.classList.remove('open');
-}
-
-if (mobileMenuBtn && sidebar && overlay) {
-  mobileMenuBtn.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
-  });
-
-  overlay.addEventListener('click', closeMobileMenu);
-}
-
-
-function triggerConfetti() {
-  if (typeof confetti !== 'undefined') {
-    const duration = 2000; const end = Date.now() + duration;
-    (function frame() {
-      confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#D4AF37', '#10B981'] });
-      confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#D4AF37', '#10B981'] });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    }());
-  }
-}
-
-function populateSelects() {
-  const employeeSelect = document.getElementById('active-employee-select');
-  employeeSelect.innerHTML = '<option value="">-- ሰራተኛውን ይምረጡ --</option>';
-  employees.forEach(emp => { employeeSelect.innerHTML += `<option value="${emp.id}">${emp.name} - ${emp.role}</option>`; });
-
-  const soldSelect = document.getElementById('product-sold-select');
-  const usedSelect = document.getElementById('product-used-select');
-  
-  soldSelect.innerHTML = '<option value="">-- ምንም አልተሸጠም --</option>';
-  usedSelect.innerHTML = '<option value="">-- ምንም ዕቃ አልወጣም --</option>';
-
-  inventory.forEach(item => {
-    const outOfStockStr = item.qty <= 0 ? " (አልቋል)" : ` (${item.qty} ቀሪ)`;
-    const opt = `<option value="${item.id}" ${item.qty <= 0 ? 'disabled' : ''}>${item.name}${outOfStockStr} - ${item.sellPrice || 0} ብር</option>`;
-    if(item.type === 'Retail') soldSelect.innerHTML += opt;
-    else usedSelect.innerHTML += opt;
-  });
-}
-
-document.getElementById('product-sold-select').addEventListener('change', (e) => {
-  document.getElementById('product-qty-group').classList.toggle('hidden', e.target.value === "");
-});
-document.getElementById('product-used-select').addEventListener('change', (e) => {
-  document.getElementById('product-used-qty-group').classList.toggle('hidden', e.target.value === "");
-});
-
-// --- CASHIER POS LOGIC ---
-document.getElementById('btn-log-service').addEventListener('click', () => {
-  const empIdVal = document.getElementById('active-employee-select').value;
-  if(!empIdVal) {
-    alert("እባክዎ የተገለገሉበትን ሰራተኛ ስም ይምረጡ! (Please select an employee)");
-    return;
-  }
-
-  const empId = parseInt(empIdVal);
-  const emp = employees.find(e => e.id === empId);
-
-  const customerName = document.getElementById('customer-name').value || 'ስም የሌለው';
-  const serviceTypeElem = document.getElementById('service-type');
-  const serviceType = serviceTypeElem.options[serviceTypeElem.selectedIndex].text;
-  
-  const paymentMethod = document.getElementById('payment-method').value; // Cash or Bank
-  const servicePrice = parseFloat(document.getElementById('service-price').value) || 0;
-  
-  const soldId = document.getElementById('product-sold-select').value;
-  let productName = "";
-  let productPrice = 0;
-  let productSoldQty = 0;
-  
-  const usedId = document.getElementById('product-used-select').value;
-  let usedName = "";
-  let productUsedQty = 0;
-
-  if(soldId) {
-    const itemInfo = inventory.find(i => i.id === soldId);
-    if(itemInfo) {
-      productSoldQty = parseInt(document.getElementById('product-sold-qty').value) || 1;
-      if(productSoldQty > itemInfo.qty) return alert("በስቶክ ውስጥ በቂ ዕቃ የለም! (Not enough retail stock)");
-      productName = itemInfo.name;
-      productPrice = itemInfo.sellPrice * productSoldQty;
-      
-      // Deduct stock
-      itemInfo.qty -= productSoldQty;
-    }
-  }
-
-  if(usedId) {
-    const itemInfo = inventory.find(i => i.id === usedId);
-    if(itemInfo) {
-      productUsedQty = parseInt(document.getElementById('product-used-qty').value) || 1;
-      if(productUsedQty > itemInfo.qty) return alert("በስቶክ ውስጥ በቂ መገልገያ ዕቃ የለም! (Not enough internal stock)");
-      usedName = itemInfo.name;
-      
-      // Deduct stock
-      itemInfo.qty -= productUsedQty;
-    }
-  }
-
-  const totalRevenue = servicePrice + productPrice;
-
-  if (totalRevenue <= 0 && !usedId) {
-    alert("እባክዎ ክፍያውን ያስገቡ ወይንም መገልገያ ዕቃ መውጣቱን ያሳውቁ! (Enter amount or select used item)");
-    return;
-  }
-
-  const isTaxed = document.getElementById('tax-receipt-toggle').checked;
-
-  const newLog = {
-    customerName: customerName,
-    employeeId: emp.id,
-    employeeName: emp.name,
-    service: serviceType,
-    servicePrice: servicePrice,
-    productName: productName,
-    productSoldQty: productSoldQty,
-    productPrice: productPrice,
-    usedName: usedName,
-    productUsedQty: productUsedQty,
-    revenue: totalRevenue,
-    paymentMethod: paymentMethod,
-    isTaxed: isTaxed,
-    timestamp: new Date().getTime()
-  };
-  
-  auditLogs.push(newLog);
-
-  document.getElementById('customer-name').value = '';
-  document.getElementById('service-price').value = '';
-  document.getElementById('product-sold-select').value = '';
-  document.getElementById('product-sold-qty').value = '1';
-  document.getElementById('product-qty-group').classList.add('hidden');
-  document.getElementById('product-used-select').value = '';
-  document.getElementById('product-used-qty').value = '1';
-  document.getElementById('product-used-qty-group').classList.add('hidden');
-  document.getElementById('active-employee-select').value = '';
-  document.getElementById('tax-receipt-toggle').checked = false;
-
-  saveData();
-  populateSelects(); // Rebuild select options with new qty
-  renderInventory(); // Update inventory table
-  renderCashierLogs();
-  updateLeaderboard();
-  triggerConfetti();
-  
-  setTimeout(() => {
-    alert(`የ ${totalRevenue} ብር ክፍያ በ${paymentMethod === 'Cash' ? 'ጥሬ ገንዘብ' : 'ባንክ'} በተሳካ ሁኔታ ተመዝግቧል!`);
-  }, 100);
-});
-
-document.getElementById('btn-print-last').addEventListener('click', () => {
-  if(auditLogs.length === 0) return alert("እስካሁን ምንም ሪከርድ የለም (No record recorded to print)");
-  const last = auditLogs[auditLogs.length - 1]; // get latest
-  
-  const pArea = document.getElementById('print-receipt-area');
-  document.getElementById('print-date').innerText = new Date(last.timestamp).toLocaleString();
-  let itemsHtml = `<b>Service:</b> ${last.service} (${last.servicePrice} ETB) <br/>`;
-  if(last.productName) itemsHtml += `<b>Product:</b> ${last.productName} (${last.productPrice} ETB) <br/>`;
-  itemsHtml += `<h4 style="margin:5px 0;">TOTAL: ${last.revenue} ETB</h4>`;
-  itemsHtml += `<div><b>Paid:</b> ${last.paymentMethod}</div>`;
-  itemsHtml += `<div><b>Stylist:</b> ${last.employeeName}</div>`;
-  
-  document.getElementById('print-content').innerHTML = itemsHtml;
-  pArea.style.display = 'block'; // Make it available to DOM before print
-  window.print();
-  pArea.style.display = 'none'; // hide it back so screen stays clean
-});
-
-function renderCashierLogs() {
-  const tbody = document.getElementById('today-logs-list');
-  tbody.innerHTML = '';
-  if(auditLogs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">በአሁኑ ሰዓት ማንም የተከፈለለት ደንበኛ የለም.</td></tr>`;
-    return;
-  }
-  
-  const recentLogs = [...auditLogs].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
-  
-  recentLogs.forEach((q, idx) => {
-    const delay = idx * 0.05;
-    const dateStr = new Date(q.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    const actionsStr = [q.service, q.productName].filter(Boolean).join(" ተገዝቷል፣ ");
-    const paymentBadgeColor = q.paymentMethod === 'Bank' ? '#3B82F6' : '#10B981';
-    const taxBadge = q.isTaxed 
-      ? '<span class="status-badge" style="background:#059669; color:white;">✓ አለው</span>'
-      : '<span class="status-badge" style="background:#DC2626; color:white;">✕ አላረፈም</span>';
-
-    tbody.innerHTML += `
-      <tr class="slide-in-right" style="animation-delay: ${delay}s">
-        <td style="color: var(--text-muted);">${dateStr}</td>
-        <td><span class="status-badge" style="background:${paymentBadgeColor}; color:white;">${q.paymentMethod === 'Bank' ? 'ባንክ' : 'ጥሬ'}</span></td>
-        <td style="font-weight: bold; color: var(--accent-gold);">${q.employeeName}</td>
-        <td style="font-size:0.9em">${actionsStr}</td>
-        <td style="color: var(--success); font-weight:bold;">ብር ${q.revenue}</td>
-        <td>${taxBadge}</td>
-      </tr>
-    `;
-  });
-}
-
-// --- MANAGER LOGIC / HISTORY FILTERING ---
-document.getElementById('manager-date-filter').addEventListener('change', updateLeaderboard);
-
-function getFilteredLogs() {
-  const filter = document.getElementById('manager-date-filter').value;
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const dayOfWeek = now.getDay() || 7; 
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 1).getTime();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-
-  return auditLogs.filter(log => {
-    if(filter === 'today') return log.timestamp >= startOfDay;
-    if(filter === 'week') return log.timestamp >= startOfWeek;
-    if(filter === 'month') return log.timestamp >= startOfMonth;
-    if(filter === 'year') return log.timestamp >= startOfYear;
-    return true; // "all"
-  });
-}
-
-function updateLeaderboard() {
-  const logsToProcess = getFilteredLogs();
-  
-  let totalRevenueReal = 0;
-  let taxedRevenue = 0;
-  let internalRevenue = 0;
-  let cashRevenue = 0;
-  let bankRevenue = 0;
-
-  const stats = {};
-  employees.forEach(e => { stats[e.id] = { name: e.name, role: e.role, score: 0, revenue: 0 }; });
-  
-  logsToProcess.forEach(log => { 
-    totalRevenueReal += (log.revenue || 0);
-
-    if (log.isTaxed) taxedRevenue += (log.revenue || 0);
-    else internalRevenue += (log.revenue || 0);
-
-    if (log.paymentMethod === 'Bank') bankRevenue += (log.revenue || 0);
-    else cashRevenue += (log.revenue || 0);
-
-    if(stats[log.employeeId]) {
-      stats[log.employeeId].score += 1; 
-      stats[log.employeeId].revenue += (log.revenue || 0);
-    }
-  });
-
-  document.getElementById('stat-total-revenue').innerText = "ብር " + totalRevenueReal.toLocaleString(); 
-  document.getElementById('stat-taxed-revenue').innerText = "ብር " + taxedRevenue.toLocaleString(); 
-  document.getElementById('stat-internal-revenue').innerText = "ብር " + internalRevenue.toLocaleString(); 
-  document.getElementById('stat-cash-revenue').innerText = "ብር " + cashRevenue.toLocaleString(); 
-  document.getElementById('stat-bank-revenue').innerText = "ብር " + bankRevenue.toLocaleString(); 
-  
-  const sortedStats = Object.values(stats).sort((a, b) => b.revenue - a.revenue);
-  
-  const lbUI = document.getElementById('leaderboard-list');
-  lbUI.innerHTML = '';
-  sortedStats.slice(0, 10).forEach((emp, index) => {
-    const delay = index * 0.05;
-    const isRankClass = index < 3 ? `rank-${index + 1}` : '';
-    lbUI.innerHTML += `<li class="${isRankClass} slide-in-right" style="animation-delay: ${delay}s"><span class="rank-idx">#${index + 1}</span><div class="rank-name">${emp.name}<span class="rank-role">${emp.role} (የሰራው: ${emp.score})</span></div><div class="rank-score">★ ብር ${emp.revenue.toLocaleString()}</div></li>`;
-  });
-
-  const auditUI = document.getElementById('manager-audit-log-list');
-  auditUI.innerHTML = '';
-  if (logsToProcess.length === 0) {
-    auditUI.innerHTML = `<tr><td colspan="5" class="empty-state">ምንም የተመዘገበ ስራ የለም (No entries for selected filter).</td></tr>`;
-  } else {
-    const recentLogs = [...logsToProcess].sort((a,b) => b.timestamp - a.timestamp);
-    recentLogs.forEach((log, idx) => {
-      const delay = idx * 0.05;
-      const dateStr = new Date(log.timestamp).toLocaleDateString() + ' ' + new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      const taxStatus = log.isTaxed ? "✓" : "✕";
-      const taxColor = log.isTaxed ? "color: var(--success);" : "color: var(--danger);";
-      const payStatus = log.paymentMethod === 'Bank' ? "ባንክ" : "ጥሬ ገንዘብ";
-      const payColor = log.paymentMethod === 'Bank' ? "#3B82F6" : "#10B981";
-
-      auditUI.innerHTML += `<tr class="slide-in-right" style="animation-delay: ${delay}s"><td style="color: var(--text-muted);">${dateStr}</td><td>${log.employeeName}</td><td><span style="color:${payColor}; border:1px solid ${payColor}; border-radius:12px; padding:2px 8px; font-size:0.8em">${payStatus}</span></td><td style="color: var(--success); font-weight:bold;">ብር ${log.revenue}</td><td style="${taxColor}">${taxStatus}</td></tr>`;
-    });
-  }
-}
-
-// CSV EXPORT LOGIC
-document.getElementById('btn-export-csv').addEventListener('click', () => {
-  const logsToProcess = getFilteredLogs();
-  if(logsToProcess.length === 0) return alert("ኤክስፖርት የሚደረግ ምንም የተመዘገበ ሪከርድ የለም (No data to export).");
-  
-  let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-  csvContent += "Date,Time,Customer Name,Employee,Service,Retail Product,Retail Qty,Used Internal Product,Used Qty,Service Fee,Product Fee,Total Paid,Payment Method,Is Official Receipt(Taxed)\n";
-  
-  logsToProcess.forEach(row => {
-    let d = new Date(row.timestamp);
-    let dateStr = d.toLocaleDateString('en-GB'); 
-    let timeStr = d.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'});
-    let pMethod = row.paymentMethod || "Cash";
-    let isTaxedStr = row.isTaxed ? "Taxed (Official)" : "Internal (Untaxed)";
-    
-    let safeCustomerName = row.customerName ? row.customerName.replace(/,/g, "") : "";
-    let safeService = row.service ? row.service.replace(/,/g, "-") : "";
-    let safeProduct = row.productName ? row.productName.replace(/,/g, "-") : "";
-    let safeUsed = row.usedName ? row.usedName.replace(/,/g, "-") : "";
-    
-    csvContent += `"${dateStr}","${timeStr}","${safeCustomerName}","${row.employeeName}","${safeService}","${safeProduct}",${row.productSoldQty||0},"${safeUsed}",${row.productUsedQty||0},${row.servicePrice||0},${row.productPrice||0},${row.revenue},"${pMethod}","${isTaxedStr}"\n`;
-  });
-  
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `Minish_Salon_Report_${new Date().toLocaleDateString('en-GB').replace(/\//g,'-')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-});
-
-// Remove destructive Clear Data button completely!
-const btnClear = document.getElementById('btn-clear-data');
-if(btnClear) btnClear.remove();
-
-document.getElementById('inv-type').addEventListener('change', (e) => {
-  const isRetail = e.target.value === 'Retail';
-  document.getElementById('inv-sell-group').style.display = isRetail ? 'block' : 'none';
-});
-
-document.getElementById('btn-add-inventory').addEventListener('click', () => {
-  const name = document.getElementById('inv-name').value.trim();
-  const type = document.getElementById('inv-type').value;
-  const qty = parseInt(document.getElementById('inv-qty').value) || 0;
-  const buyPrice = parseFloat(document.getElementById('inv-buy').value) || 0;
-  const sellPrice = type === 'Retail' ? (parseFloat(document.getElementById('inv-sell').value) || 0) : 0;
-
-  if(!name || qty <= 0 || buyPrice <= 0) return alert("እባክዎ ሙሉ መረጃ ያስገቡ! (Please enter valid details)");
-
-  inventory.push({ 
-    id: "item_" + new Date().getTime(), 
-    name, type, qty, buyPrice, sellPrice, 
-    addedAt: new Date().getTime() 
-  });
-
-  document.getElementById('inv-name').value = '';
-  document.getElementById('inv-qty').value = '';
-  document.getElementById('inv-buy').value = '';
-  document.getElementById('inv-sell').value = '';
-
-  saveData();
-  renderInventory();
-  populateSelects();
-  alert("እቃው በተሳካ ሁኔታ ተመዝግቧል! (Item added successfully!)");
-});
-
-function deleteInventory(id) {
-  if(confirm("ይህ እቃ ይሰረዝ? (Delete this item?)")) {
-    inventory = inventory.filter(i => i.id !== id);
-    saveData();
-    renderInventory();
-    populateSelects();
-  }
-}
-
-// Ensure this function is globally accessible
-window.deleteInventory = deleteInventory;
-
-function renderInventory() {
-  const list = document.getElementById('inventory-list');
-  if(!list) return;
-  list.innerHTML = '';
-  if(inventory.length === 0) {
-    list.innerHTML = `<tr><td colspan="6" class="empty-state">ምንም የተመዘገበ ዕቃ የለም (No items in inventory).</td></tr>`;
-    return;
-  }
-  
-  inventory.forEach(item => {
-    let warningStyle = item.qty < 5 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--success);';
-    let typeBadge = item.type === 'Retail' 
-      ? '<span class="status-badge" style="background:var(--accent-gold); color:#000;">ለሽያጭ</span>'
-      : '<span class="status-badge" style="background:#3B82F6; color:#fff;">መገልገያ</span>';
-      
-    list.innerHTML += `
-      <tr>
-        <td style="font-weight:bold;">${item.name}</td>
-        <td>${typeBadge}</td>
-        <td style="${warningStyle}">${item.qty} ፍሬ</td>
-        <td>ብር ${item.buyPrice}</td>
-        <td>${item.type === 'Retail' ? 'ብር ' + item.sellPrice : '-'}</td>
-        <td><button onclick="window.deleteInventory('${item.id}')" class="btn-danger" style="padding: 5px 10px; width:auto; font-size:0.8rem;">ሰርዝ (X)</button></td>
-      </tr>
-    `;
-  });
-}
-
-populateSelects();
-renderCashierLogs();
-updateLeaderboard();
-renderInventory();
->>>>>>> 9e7f09a (Upload Final Clean V5 Salon System (Resolved Secret Scanning))

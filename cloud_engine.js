@@ -18,9 +18,9 @@ async function readLogs() {
       .order('timestamp', { ascending: false });
     if (error) throw error;
     return data.map(t => ({
-      id: t.id, timestamp: t.timestamp,
+      id: t.id, timestamp: new Date(t.timestamp).getTime(),
       employeeId: t.employee_id, employeeName: t.employee_name,
-      service: t.service_desc, revenue: t.revenue,
+      service: t.service_desc, revenue: parseFloat(t.revenue) || 0,
       paymentMethod: t.payment_method, customerName: t.customer_name,
       points: t.points, ...t.details
     }));
@@ -50,8 +50,8 @@ async function readExpenses() {
       .order('timestamp', { ascending: false });
     if (error) throw error;
     return data.map(e => ({
-      id: e.id, amount: e.amount, description: e.description,
-      expense_type: e.expense_type, timestamp: e.timestamp, tip_payout: e.tip_payout
+      id: e.id, amount: parseFloat(e.amount) || 0, description: e.description,
+      expense_type: e.expense_type, timestamp: new Date(e.timestamp).getTime(), tip_payout: e.tip_payout
     }));
   } catch (e) { console.error("Cloud ReadExpenses Error:", e); return []; }
 }
