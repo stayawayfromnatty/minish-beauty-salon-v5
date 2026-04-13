@@ -208,28 +208,56 @@ const SERVICE_OPTIONS = {
     { text: "ካስክ (Kask)", value: "Kask", price: 400 }
   ],
   NAILS: [
-    { text: "Gel by Shilak", value: "GelShilak", price: 1500 },
-    { text: "Litef by Normal", value: "LitefNormal", price: 1000 },
+    { text: "Gel / Acrylic (ጄል)", value: "Gel", price: 1500 },
+    { text: "Litef (ሊጠፍ)", value: "Litef", price: 1000 },
+    { text: "Shilak (ሽላክ መቀባት)", value: "Shilak", price: 500 },
+    { text: "Normal Shilak (ኖርማል ሽላክ)", value: "NormalShilak", price: 500 },
+    { text: "Refill Shilak (ሽላክ ሪፊል)", value: "RefillShilak", price: 1200 },
+    { text: "Removing Shilak (ሽላክ ማንሳት)", value: "RemovingShilak", price: 200 },
+    { text: "Removing Gel (ጄል ማንሳት)", value: "RemovingGel", price: 300 },
+    { text: "Normal Polish (ኖርማል)", value: "NormalPolish", price: 200 },
     { text: "Pedicure (የእግር ጥፍር)", value: "Pedicure", price: 1000 },
+    { text: "Special Pedicure", value: "SpecialPedicure", price: 1500 },
     { text: "Manicure (የእጅ ጥፍር)", value: "Manicure", price: 500 }
   ],
   FACE: [
-    { text: "EYE BROW OMBRE", value: "Ombre", price: 7000 },
-    { text: "Eyebrow Wax", value: "Wax", price: 300 },
-    { text: "Make up", value: "Makeup", price: 2500 },
-    { text: "Eyelash Extension", value: "Eyelash", price: 2000 }
+    { text: "EYE BROW OMBRE (ሚኒሽ ስፔሻል)", value: "Ombre", price: 7000 },
+    { text: "Eyebrow Razor (በምላጭ)", value: "Razor", price: 100 },
+    { text: "Eyebrow Thread (በክር)", value: "Thread", price: 200 },
+    { text: "Eyebrow Wax (በዋክስ)", value: "Wax", price: 300 },
+    { text: "Facial Massage (የፊት ማሳጅ)", value: "Facial", price: 300 },
+    { text: "Make up with eyelash", value: "MakeupLash", price: 3000 },
+    { text: "Make up (ሜካፕ)", value: "Makeup", price: 2500 },
+    { text: "Eyelash Extension (ሽፋሽፍት)", value: "Eyelash", price: 2000 }
   ],
   SPA: [
+    { text: "Minish Special Moroccan Bath", value: "MinishMorocco", price: 3800 },
     { text: "Special Moroccan Bath", value: "SpecialMorocco", price: 3000 },
-    { text: "Normal Moroccan Bath", value: "NormalMorocco", price: 2500 }
+    { text: "Normal Moroccan Bath", value: "NormalMorocco", price: 2500 },
+    { text: "Full Body Massage", value: "FullMassage", price: 1500 },
+    { text: "Normal Steam", value: "Steam", price: 1000 }
   ],
   BRAID: [
+    { text: "Cornrow with 1 wig", value: "CornrowWig", price: 800 },
+    { text: "Box Braid with 1 wig", value: "BoxBraidWig", price: 800 },
     { text: "Cornrows (ቁጥርጥር)", value: "Cornrows", price: 500 },
     { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 }
   ],
   COLOR_WASH: [
-    { text: "Hair Color - Full", value: "ColorFull", price: 8000 },
-    { text: "Washing (ፀጉር ማጠብ)", value: "Washing", price: 200 }
+    { text: "Hair Color - Full (ሙሉ)", value: "ColorFull", price: 8000 },
+    { text: "Hair Color - Roots (ቁርጭምጭሚት)", value: "ColorRoots", price: 1000 },
+    { text: "Washing (ፀጉር ማጠብ)", value: "Washing", price: 200 },
+    { text: "Special Treatment (ቅባት)", value: "Treatment", price: 900 }
+  ],
+  SPECIAL: [
+    { text: "Bridal Package", value: "Bridal", price: 10000 },
+    { text: "Bridal work (Mother)", value: "BridalMom", price: 1000 },
+    { text: "Full Body wax", value: "FullBodyWax", price: 4000 },
+    { text: "Brazillian Wax", value: "BrazillianWax", price: 1500 },
+    { text: "Full Hand wax", value: "HandWax", price: 1000 },
+    { text: "Miniskrit wax", value: "MiniWax", price: 1500 },
+    { text: "Armpit wax", value: "ArmpitWax", price: 400 },
+    { text: "Upper lip wax", value: "LipWax", price: 300 }
   ]
 };
 
@@ -241,13 +269,40 @@ document.getElementById('active-employee-select').addEventListener('change', (e)
   if (!emp) return;
 
   let opts = [];
-  if (emp.id === 17) opts = [...Object.values(SERVICE_OPTIONS).flat()];
-  else if (emp.role.includes("ጥፍር")) opts = [...SERVICE_OPTIONS.NAILS];
-  else if (emp.role.includes("ሹሩባ")) opts = [...SERVICE_OPTIONS.BRAID];
-  else if (emp.role.includes("ሞሮኮ")) opts = [...SERVICE_OPTIONS.SPA];
-  else opts = [...SERVICE_OPTIONS.HAIR, ...SERVICE_OPTIONS.COLOR_WASH, ...SERVICE_OPTIONS.FACE];
+  if (emp.id === 17 || emp.name.includes("Minish")) {
+    opts = [...Object.values(SERVICE_OPTIONS).flat()];
+  } else {
+    const role = emp.role.toLowerCase();
+    if (role.includes("ጥፍር")) opts.push(...SERVICE_OPTIONS.NAILS);
+    if (role.includes("ሹሩባ") || role.includes("ቁጥርጥር")) opts.push(...SERVICE_OPTIONS.BRAID);
+    if (role.includes("ሞሮኮ") || role.includes("ማሳጅ")) opts.push(...SERVICE_OPTIONS.SPA);
+    if (role.includes("ቀለም")) opts.push(...SERVICE_OPTIONS.COLOR_WASH);
+    if (role.includes("ፀጉር") || role.includes("መቁረጥ") || role.includes("አስተካካይ")) opts.push(...SERVICE_OPTIONS.HAIR);
+    if (role.includes("ቅንድብ") || role.includes("ፊት") || role.includes("ሽፋሽፍት") || role.includes("makeup")) opts.push(...SERVICE_OPTIONS.FACE);
+    if (role.includes("wax") || role.includes("body") || role.includes("bridal")) opts.push(...SERVICE_OPTIONS.SPECIAL);
+    
+    // Fallback for general washers or others
+    if (role.includes("አጣቢ") || role.includes("ማጠቢያ") || role.includes("wash")) {
+      if (!opts.some(o => o.value === "Washing")) {
+        opts.push(...SERVICE_OPTIONS.COLOR_WASH);
+      }
+    }
+    
+    // Default fallback if no specific traits matched
+    if (opts.length === 0) {
+      opts = [...SERVICE_OPTIONS.HAIR, ...SERVICE_OPTIONS.COLOR_WASH, ...SERVICE_OPTIONS.FACE];
+    }
+  }
 
-  opts.forEach(opt => {
+  // Remove duplicates
+  const seen = new Set();
+  const uniqueOpts = opts.filter(o => {
+    if (seen.has(o.value)) return false;
+    seen.add(o.value);
+    return true;
+  });
+
+  uniqueOpts.forEach(opt => {
     serviceSelect.innerHTML += `<option value="${opt.value}" data-price="${opt.price || ''}">${opt.text}</option>`;
   });
 });
