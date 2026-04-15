@@ -421,12 +421,21 @@ document.getElementById('btn-finish-session').addEventListener('click', async ()
     } catch (e) { console.error(e); alert("መመዝገብ አልተቻለም"); }
 });
 
+// Ethiopian Business Date helper: shifts time backwards by 6 hours.
+// So transactions between midnight and 6:00 AM belong to the previous business day.
+function getBizDate(ms) {
+    const d = new Date(ms);
+    d.setHours(d.getHours() - 6);
+    return d;
+}
+
 // Manager & Financial Restoration
 function updateLeaderboard() {
     const filter = document.getElementById('manager-date-filter').value;
-    const now = new Date();
+    const now = getBizDate(new Date());
+
     const filteredLogs = auditLogs.filter(log => {
-        const d = new Date(log.timestamp);
+        const d = getBizDate(log.timestamp);
         if (filter === 'today') return d.toDateString() === now.toDateString();
         
         if (filter === 'yesterday') {
@@ -437,7 +446,8 @@ function updateLeaderboard() {
 
         if (filter === 'specific') {
             const specDate = document.getElementById('manager-specific-date').value;
-            return d.toISOString().split('T')[0] === specDate;
+            const localYMD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            return localYMD === specDate;
         }
 
         if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
@@ -446,7 +456,7 @@ function updateLeaderboard() {
     });
 
     const filteredExpenses = expensesList.filter(e => {
-        const d = new Date(e.timestamp);
+        const d = getBizDate(e.timestamp);
         if (filter === 'today') return d.toDateString() === now.toDateString();
         
         if (filter === 'yesterday') {
@@ -457,7 +467,8 @@ function updateLeaderboard() {
 
         if (filter === 'specific') {
             const specDate = document.getElementById('manager-specific-date').value;
-            return d.toISOString().split('T')[0] === specDate;
+            const localYMD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            return localYMD === specDate;
         }
 
         if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
@@ -505,7 +516,7 @@ function updateLeaderboard() {
     filteredLogs.sort((a,b)=>b.timestamp - a.timestamp).slice(0, 50).forEach(l => {
         const vat = Math.round(l.revenue - (l.revenue / 1.15));
         historyUI.innerHTML += `<tr>
-            <td>${new Date(l.timestamp).toLocaleDateString()}</td>
+            <td>${getBizDate(l.timestamp).toLocaleDateString()}</td>
             <td>${l.employeeName}</td>
             <td>${l.paymentMethod==='Bank'?'ባንክ':'ጥሬ'}</td>
             <td>${l.revenue}</td>
@@ -570,7 +581,7 @@ function renderCashierLogs() {
 // Export & Print
 document.getElementById('btn-export-csv').addEventListener('click', () => {
     let csv = "Date,Employee,Method,Revenue,VAT\n";
-    auditLogs.forEach(l => csv += `${new Date(l.timestamp).toLocaleDateString()},${l.employeeName},${l.paymentMethod},${l.revenue},${Math.round(l.revenue*0.13)}\n`);
+    auditLogs.forEach(l => csv += `${getBizDate(l.timestamp).toLocaleDateString()},${l.employeeName},${l.paymentMethod},${l.revenue},${Math.round(l.revenue*0.13)}\n`);
     const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8,\uFEFF" + csv)); link.setAttribute("download", "Minish_Report.csv"); link.click();
 });
 
