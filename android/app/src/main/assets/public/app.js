@@ -1,3 +1,16 @@
+// --- Global Error Handler for Mobile Debugging ---
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  const message = [
+    'Message: ' + msg,
+    'URL: ' + url,
+    'Line: ' + lineNo,
+    'Column: ' + columnNo,
+    'Error object: ' + JSON.stringify(error)
+  ].join(' - ');
+  alert("APP CRASHED: " + message);
+  return false;
+};
+
 const employees = [
   { id: 1, name: "Sara (ሳራ)", role: "ማናጀር / ቀለም" },
   { id: 17, name: "Minish (ሚኒሽ)", role: "የሳሎኑ ባለቤት / ዋና ባለሙያ" },
@@ -76,17 +89,46 @@ async function loadData() {
 
 window.addEventListener('DOMContentLoaded', loadData);
 
-// Mobile Sidebar Toggle
+// Mobile Sidebar Toggle (Safe for iOS)
 function openSidebar() {
-  document.getElementById('sidebar').classList.add('open');
-  document.getElementById('sidebar-overlay').classList.add('open');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && overlay) {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+  }
 }
 function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebar-overlay').classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && overlay) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  }
 }
-document.getElementById('floating-menu-btn').addEventListener('click', openSidebar);
-document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+
+// Attach listeners safely
+document.addEventListener('DOMContentLoaded', () => {
+  const menuBtn = document.getElementById('floating-menu-btn');
+  const overlay = document.getElementById('sidebar-overlay');
+  
+  if (menuBtn) {
+    menuBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openSidebar();
+    });
+    // Add touchstart for faster response on iOS
+    menuBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        openSidebar();
+    }, {passive: false});
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+    overlay.addEventListener('touchstart', closeSidebar);
+  }
+});
 
 // Navigation Logic
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -163,14 +205,14 @@ const SERVICE_OPTIONS = {
     { text: "Pubis (ፑቢስ)", value: "Pubis", price: 500 },
     { text: "Sab Sab (ሳብ ሳብ)", value: "SabSab", price: 500 },
     { text: "Peystra (ፔይስትራ)", value: "Peystra", price: 500 },
+    { text: "Normal Sifet (ሲፌት)", value: "NormalSifet", price: 700 },
+    { text: "Sigsig Sifet (ሲግሲግ ሲፌት)", value: "SigsigSifet", price: 800 },
     { text: "ካስክ (Kask)", value: "Kask", price: 400 }
   ],
   NAILS: [
     { text: "Gel / Acrylic (ጄል)", value: "Gel", price: 1500 },
-    { text: "Litef (ሊጠፍ)", value: "Litef", price: 1000 },
-    { text: "Shilak (ሽላክ መቀባት)", value: "Shilak", price: 500 },
-    { text: "Normal Shilak (ኖርማል ሽላክ)", value: "NormalShilak", price: 500 },
-    { text: "Refill Shilak (ሽላክ ሪፊል)", value: "RefillShilak", price: 1200 },
+    { text: "Litef by Shilak", value: "LitefShilak", price: 1200 },
+    { text: "Gel by Shilak", value: "GelShilak", price: 1500 },
     { text: "Removing Shilak (ሽላክ ማንሳት)", value: "RemovingShilak", price: 200 },
     { text: "Removing Gel (ጄል ማንሳት)", value: "RemovingGel", price: 300 },
     { text: "Normal Polish (ኖርማል)", value: "NormalPolish", price: 200 },
@@ -200,12 +242,13 @@ const SERVICE_OPTIONS = {
     { text: "Cornrow with 1 wig", value: "CornrowWig", price: 800 },
     { text: "Box Braid with 1 wig", value: "BoxBraidWig", price: 800 },
     { text: "Cornrows (ቁጥርጥር)", value: "Cornrows", price: 500 },
-    { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 }
+    { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 },
+    { text: "Normal Sifet (ሲፌት)", value: "NormalSifet", price: 700 },
+    { text: "Sigsig Sifet (ሲግሲግ ሲፌት)", value: "SigsigSifet", price: 800 }
   ],
   COLOR_WASH: [
     { text: "Hair Color - Full (ሙሉ)", value: "ColorFull", price: 8000 },
     { text: "Hair Color - Roots (ቁርጭምጭሚት)", value: "ColorRoots", price: 1000 },
-    { text: "Black Shampoo", value: "BlackShampoo", price: 400 },
     { text: "Washing (ፀጉር ማጠብ)", value: "Washing", price: 200 },
     { text: "Special Treatment (ቅባት)", value: "Treatment", price: 900 }
   ],
@@ -380,12 +423,21 @@ document.getElementById('btn-finish-session').addEventListener('click', async ()
     } catch (e) { console.error(e); alert("መመዝገብ አልተቻለም"); }
 });
 
+// Ethiopian Business Date helper: shifts time backwards by 6 hours.
+// So transactions between midnight and 6:00 AM belong to the previous business day.
+function getBizDate(ms) {
+    const d = new Date(ms);
+    d.setHours(d.getHours() - 6);
+    return d;
+}
+
 // Manager & Financial Restoration
 function updateLeaderboard() {
     const filter = document.getElementById('manager-date-filter').value;
-    const now = new Date();
+    const now = getBizDate(new Date());
+
     const filteredLogs = auditLogs.filter(log => {
-        const d = new Date(log.timestamp);
+        const d = getBizDate(log.timestamp);
         if (filter === 'today') return d.toDateString() === now.toDateString();
         
         if (filter === 'yesterday') {
@@ -396,7 +448,8 @@ function updateLeaderboard() {
 
         if (filter === 'specific') {
             const specDate = document.getElementById('manager-specific-date').value;
-            return d.toISOString().split('T')[0] === specDate;
+            const localYMD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            return localYMD === specDate;
         }
 
         if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
@@ -405,7 +458,7 @@ function updateLeaderboard() {
     });
 
     const filteredExpenses = expensesList.filter(e => {
-        const d = new Date(e.timestamp);
+        const d = getBizDate(e.timestamp);
         if (filter === 'today') return d.toDateString() === now.toDateString();
         
         if (filter === 'yesterday') {
@@ -416,7 +469,8 @@ function updateLeaderboard() {
 
         if (filter === 'specific') {
             const specDate = document.getElementById('manager-specific-date').value;
-            return d.toISOString().split('T')[0] === specDate;
+            const localYMD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            return localYMD === specDate;
         }
 
         if (filter === 'week') return (now - d) < (7 * 24 * 3600 * 1000);
@@ -464,7 +518,7 @@ function updateLeaderboard() {
     filteredLogs.sort((a,b)=>b.timestamp - a.timestamp).slice(0, 50).forEach(l => {
         const vat = Math.round(l.revenue - (l.revenue / 1.15));
         historyUI.innerHTML += `<tr>
-            <td>${new Date(l.timestamp).toLocaleDateString()}</td>
+            <td>${getBizDate(l.timestamp).toLocaleDateString()}</td>
             <td>${l.employeeName}</td>
             <td>${l.paymentMethod==='Bank'?'ባንክ':'ጥሬ'}</td>
             <td>${l.revenue}</td>
@@ -477,7 +531,7 @@ function updateLeaderboard() {
     const expUI = document.getElementById('expense-list-mini');
     expUI.innerHTML = '';
     filteredExpenses.slice(0, 5).forEach(e => {
-        expUI.innerHTML += `<tr><td>${e.description}</td><td>${e.expense_type}</td><td>${e.amount}</td></tr>`;
+        expUI.innerHTML += `<tr><td>${e.description}</td><td>${e.expense_type}</td><td>${e.amount}</td><td><button onclick="deleteExpenseEntry('${e.id}')" class="btn-danger" style="padding:2px 8px;">X</button></td></tr>`;
     });
 }
 
@@ -509,6 +563,14 @@ async function deleteLogEntry(ts) {
 }
 window.deleteLogEntry = deleteLogEntry;
 
+async function deleteExpenseEntry(id) {
+    if (confirm("ይህን ወጪ መሰረዝ ይፈልጋሉ?")) {
+        await sbFetch(`expenses?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+        loadData();
+    }
+}
+window.deleteExpenseEntry = deleteExpenseEntry;
+
 function renderCashierLogs() {
     const tbody = document.getElementById('today-logs-list');
     tbody.innerHTML = '';
@@ -521,7 +583,7 @@ function renderCashierLogs() {
 // Export & Print
 document.getElementById('btn-export-csv').addEventListener('click', () => {
     let csv = "Date,Employee,Method,Revenue,VAT\n";
-    auditLogs.forEach(l => csv += `${new Date(l.timestamp).toLocaleDateString()},${l.employeeName},${l.paymentMethod},${l.revenue},${Math.round(l.revenue*0.13)}\n`);
+    auditLogs.forEach(l => csv += `${getBizDate(l.timestamp).toLocaleDateString()},${l.employeeName},${l.paymentMethod},${l.revenue},${Math.round(l.revenue*0.13)}\n`);
     const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8,\uFEFF" + csv)); link.setAttribute("download", "Minish_Report.csv"); link.click();
 });
 

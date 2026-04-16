@@ -205,14 +205,14 @@ const SERVICE_OPTIONS = {
     { text: "Pubis (ፑቢስ)", value: "Pubis", price: 500 },
     { text: "Sab Sab (ሳብ ሳብ)", value: "SabSab", price: 500 },
     { text: "Peystra (ፔይስትራ)", value: "Peystra", price: 500 },
+    { text: "Normal Sifet (ሲፌት)", value: "NormalSifet", price: 700 },
+    { text: "Sigsig Sifet (ሲግሲግ ሲፌት)", value: "SigsigSifet", price: 800 },
     { text: "ካስክ (Kask)", value: "Kask", price: 400 }
   ],
   NAILS: [
     { text: "Gel / Acrylic (ጄል)", value: "Gel", price: 1500 },
-    { text: "Litef (ሊጠፍ)", value: "Litef", price: 1000 },
-    { text: "Shilak (ሽላክ መቀባት)", value: "Shilak", price: 500 },
-    { text: "Normal Shilak (ኖርማል ሽላክ)", value: "NormalShilak", price: 500 },
-    { text: "Refill Shilak (ሽላክ ሪፊል)", value: "RefillShilak", price: 1200 },
+    { text: "Litef by Shilak", value: "LitefShilak", price: 1200 },
+    { text: "Gel by Shilak", value: "GelShilak", price: 1500 },
     { text: "Removing Shilak (ሽላክ ማንሳት)", value: "RemovingShilak", price: 200 },
     { text: "Removing Gel (ጄል ማንሳት)", value: "RemovingGel", price: 300 },
     { text: "Normal Polish (ኖርማል)", value: "NormalPolish", price: 200 },
@@ -242,7 +242,9 @@ const SERVICE_OPTIONS = {
     { text: "Cornrow with 1 wig", value: "CornrowWig", price: 800 },
     { text: "Box Braid with 1 wig", value: "BoxBraidWig", price: 800 },
     { text: "Cornrows (ቁጥርጥር)", value: "Cornrows", price: 500 },
-    { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 }
+    { text: "Box Braids (ሹሩባ)", value: "BoxBraids", price: 500 },
+    { text: "Normal Sifet (ሲፌት)", value: "NormalSifet", price: 700 },
+    { text: "Sigsig Sifet (ሲግሲግ ሲፌት)", value: "SigsigSifet", price: 800 }
   ],
   COLOR_WASH: [
     { text: "Hair Color - Full (ሙሉ)", value: "ColorFull", price: 8000 },
